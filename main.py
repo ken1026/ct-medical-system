@@ -342,19 +342,18 @@ def validate_and_process_image(uploaded_file):
 # データベース初期化
 @st.cache_resource
 def init_connection():
-    """PostgreSQL接続を初期化（SQLiteフォールバック）"""
+    """PostgreSQL接続を初期化"""
     try:
-        if "postgres" in st.secrets:
-            conn = psycopg2.connect(**st.secrets["postgres"])
-            st.success("✅ PostgreSQL接続成功")
-            return conn
-        else:
-            st.warning("PostgreSQL設定なし、SQLiteを使用")
-            return sqlite3.connect(':memory:')
+        conn = psycopg2.connect(**st.secrets["postgres"])
+        # 接続テスト
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.close()
+        st.success("✅ PostgreSQL接続成功")
+        return conn
     except Exception as e:
-        st.error(f"PostgreSQL接続失敗: {e}")
-        st.info("SQLiteフォールバック")
-        return sqlite3.connect(':memory:')
+        st.error(f"データベース接続エラー: {e}")
+        return None
 
 def init_database():
     """PostgreSQLテーブルを初期化"""
