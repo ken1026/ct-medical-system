@@ -105,7 +105,7 @@ def get_user_by_id(user_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, email FROM users WHERE id = ?", (user_id,))
+        cursor.execute("SELECT id, name, email FROM users WHERE id = %s", (user_id,))
         user = cursor.fetchone()
         conn.close()
         return user
@@ -537,26 +537,42 @@ def hash_password(password):
 def authenticate_user(email, password):
     """ユーザー認証"""
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name, email FROM users WHERE email = ? AND password = ?", 
-                   (email, hash_password(password)))
-    user = cursor.fetchone()
-    conn.close()
-    return user
+    if not conn:
+        return None
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, email FROM users WHERE email = %s AND password = %s", 
+                       (email, hash_password(password)))
+        user = cursor.fetchone()
+        return user
+    except Exception as e:
+        st.error(f"認証エラー: {e}")
+        return None
+    finally:
+        if conn:
+            cursor.close()
+            conn.close()
 
 def register_user(name, email, password):
     """新規ユーザー登録"""
     conn = get_db_connection()
-    cursor = conn.cursor()
+    if not conn:
+        return False
+    
     try:
-        cursor.execute("INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
                       (name, email, hash_password(password)))
         conn.commit()
-        conn.close()
         return True
-    except sqlite3.IntegrityError:
-        conn.close()
+    except Exception as e:
+        st.error(f"ユーザー登録エラー: {e}")
         return False
+    finally:
+        if conn:
+            cursor.close()
+            conn.close()
 
 # データベース操作関数
 def get_all_sicks():
@@ -586,7 +602,7 @@ def get_sick_by_id(sick_id):
     """IDで疾患データを取得"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM sicks WHERE id = ?", (sick_id,))
+    cursor.execute("SELECT * FROM sicks WHERE id = %s", (sick_id,))
     sick = cursor.fetchone()
     conn.close()
     return sick
@@ -602,7 +618,7 @@ def get_form_by_id(form_id):
     """IDでお知らせを取得"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM forms WHERE id = ?", (form_id,))
+    cursor.execute("SELECT * FROM forms WHERE id = %s", (form_id,))
     form = cursor.fetchone()
     conn.close()
     return form
@@ -622,7 +638,7 @@ def add_form(title, main, post_img=None):
     """新しいお知らせを追加"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO forms (title, main, post_img) VALUES (?, ?, ?)', (title, main, post_img))
+    cursor.execute('INSERT INTO forms (title, main, post_img) VALUES (%s, %s, %s)', (title, main, post_img))
     conn.commit()
     conn.close()
 
@@ -650,7 +666,7 @@ def delete_form(form_id):
     """お知らせを削除"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM forms WHERE id = ?', (form_id,))
+    cursor.execute('DELETE FROM forms WHERE id = %s', (form_id,))
     conn.commit()
     conn.close()
 
@@ -658,7 +674,7 @@ def delete_sick(sick_id):
     """疾患データを削除"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM sicks WHERE id = ?', (sick_id,))
+    cursor.execute('DELETE FROM sicks WHERE id = %s', (sick_id,))
     conn.commit()
     conn.close()
 
@@ -694,7 +710,7 @@ def get_protocol_by_id(protocol_id):
     """IDでCTプロトコルを取得"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM protocols WHERE id = ?", (protocol_id,))
+    cursor.execute("SELECT * FROM protocols WHERE id = %s", (protocol_id,))
     protocol = cursor.fetchone()
     conn.close()
     return protocol
@@ -725,7 +741,7 @@ def delete_protocol(protocol_id):
     """CTプロトコルを削除"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM protocols WHERE id = ?', (protocol_id,))
+    cursor.execute('DELETE FROM protocols WHERE id = %s', (protocol_id,))
     conn.commit()
     conn.close()
 
@@ -956,7 +972,7 @@ def restore_from_json(json_data):
                 try:
                     cursor.execute('''
                         INSERT INTO forms (title, main, post_img)
-                        VALUES (?, ?, ?)
+                        VALUES (%s, %s, %s)
                     ''', (
                         form.get('title', ''),
                         form.get('main', ''),
@@ -1076,7 +1092,7 @@ def delete_user(user_id):
     """ユーザーを削除（管理者用）"""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+    cursor.execute('DELETE FROM users WHERE id = %s', (user_id,))
     conn.commit()
     conn.close()
 
@@ -1840,7 +1856,7 @@ def show_create_disease_page():
                 # 最新の疾患データを取得
                 conn = get_db_connection()
                 cursor = conn.cursor()
-                cursor.execute("SELECT id FROM sicks WHERE diesease = ? ORDER BY created_at DESC LIMIT 1", 
+                cursor.execute("SELECT id FROM sicks WHERE diesease = %s ORDER BY created_at DESC LIMIT 1", 
                               (st.session_state.get('created_disease_name', ''),))
                 result = cursor.fetchone()
                 conn.close()
@@ -2367,7 +2383,7 @@ def show_create_protocol_page():
                 # 作成したプロトコル詳細ページに移動
                 conn = get_db_connection()
                 cursor = conn.cursor()
-                cursor.execute("SELECT id FROM protocols WHERE title = ? AND category = ? ORDER BY created_at DESC LIMIT 1", 
+                cursor.execute("SELECT id FROM protocols WHERE title = %s AND category = ? ORDER BY created_at DESC LIMIT 1", 
                               (st.session_state.get('created_protocol_title', ''), st.session_state.get('created_protocol_category', '')))
                 result = cursor.fetchone()
                 conn.close()
