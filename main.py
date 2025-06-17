@@ -357,7 +357,6 @@ def init_connection():
         cursor.execute("SELECT 1")
         cursor.close()
         conn.close()
-        st.success("✅ PostgreSQL接続成功")
         return True
     except Exception as e:
         st.error(f"データベース接続エラー: {e}")
@@ -519,7 +518,6 @@ def insert_sample_data():
             st.warning(f"プロトコルデータ作成スキップ: {e}")
         
         conn.commit()
-        st.success("✅ サンプルデータ作成完了")
         
     except Exception as e:
         st.error(f"❌ サンプルデータ作成エラー: {e}")
@@ -575,10 +573,19 @@ def register_user(name, email, password):
             conn.close()
 
 # データベース操作関数
+@st.cache_data(ttl=300)  # 5分間キャッシュ
 def get_all_sicks():
     """全疾患データを取得"""
     conn = get_db_connection()
     df = pd.read_sql_query("SELECT * FROM sicks ORDER BY diesease", conn)
+    conn.close()
+    return df
+
+@st.cache_data(ttl=300)
+def get_all_forms():
+    """全お知らせを取得"""
+    conn = get_db_connection()
+    df = pd.read_sql_query("SELECT * FROM forms ORDER BY created_at DESC", conn)
     conn.close()
     return df
 
@@ -587,9 +594,9 @@ def search_sicks(search_term):
     conn = get_db_connection()
     query = """
         SELECT * FROM sicks 
-        WHERE diesease LIKE ? OR diesease_text LIKE ? OR keyword LIKE ? 
-        OR protocol LIKE ? OR protocol_text LIKE ? OR processing LIKE ? 
-        OR processing_text LIKE ? OR contrast LIKE ? OR contrast_text LIKE ?
+        WHERE diesease LIKE %s OR diesease_text LIKE %s OR keyword LIKE %s 
+        OR protocol LIKE %s OR protocol_text LIKE %s OR processing LIKE %s 
+        OR processing_text LIKE %s OR contrast LIKE %s OR contrast_text LIKE %s
         ORDER BY diesease
     """
     search_pattern = f"%{search_term}%"
@@ -697,7 +704,7 @@ def search_protocols(search_term):
     conn = get_db_connection()
     query = """
         SELECT * FROM protocols 
-        WHERE title LIKE ? OR content LIKE ? OR category LIKE ?
+        WHERE title LIKE %s OR content LIKE %s OR category LIKE %s
         ORDER BY category, title
     """
     search_pattern = f"%{search_term}%"
@@ -2902,16 +2909,16 @@ def show_sidebar():
 # メイン処理
 def main():
     """メイン処理"""
-    # データベース接続テスト
-    init_connection()
-    
-    # データベース初期化
-    try:
-        init_database()
-        insert_sample_data()
-    except Exception as e:
-        st.error(f"データベース初期化エラー: {e}")
-        st.warning("一部機能が制限される場合があります")
+    # 初回のみデータベース初期化（パフォーマンス改善）
+    if 'db_initialized' not in st.session_state:
+        init_connection()
+        try:
+            init_database()
+            insert_sample_data()
+            st.session_state.db_initialized = True
+        except Exception as e:
+            st.error(f"データベース初期化エラー: {e}")
+            st.warning("一部機能が制限される場合があります")
     
     # セッション状態の復元（ブラウザ更新対応）
     if 'user' not in st.session_state:
