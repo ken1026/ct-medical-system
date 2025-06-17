@@ -440,62 +440,87 @@ def init_database():
 # 初期データ投入
 def insert_sample_data():
     """サンプルデータを挿入"""
-    conn = init_connection()
-    cursor = conn.cursor()
-    
-    # サンプルユーザーデータ
-    sample_users = [
-        ("管理者", "admin@hospital.jp", "Okiyoshi1126"),
-        ("技師", "tech@hospital.jp", "Tech123")
-    ]
-    
-    for user_data in sample_users:
-        cursor.execute("SELECT COUNT(*) FROM users WHERE email = %s", (user_data[1],))
-        if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
-                          (user_data[0], user_data[1], hash_password(user_data[2])))
-    
-    # 疾患サンプルデータ
-    sample_sicks = [
-        ("脳梗塞", "脳血管が詰まる疾患", "脳梗塞,stroke", "頭部造影CT", "造影剤使用", "緊急検査", "迅速な対応", "あり", "造影剤注入", "", "", "", ""),
-        ("肺炎", "肺の感染症", "肺炎,pneumonia", "胸部CT", "単純CT", "標準撮影", "呼吸停止", "なし", "造影不要", "", "", "", "")
-    ]
-    
-    for sick in sample_sicks:
-        cursor.execute("SELECT COUNT(*) FROM sicks WHERE diesease = %s", (sick[0],))
-        if cursor.fetchone()[0] == 0:
-            cursor.execute('''
-                INSERT INTO sicks (
-                    diesease, diesease_text, keyword, protocol, protocol_text,
-                    processing, processing_text, contrast, contrast_text,
-                    diesease_img, protocol_img, processing_img, contrast_img
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', sick)
-    
-    # お知らせサンプルデータ
-    sample_forms = [
-        ("システム運用開始", "CT医療システムの運用を開始しました。", ""),
-        ("利用方法について", "疾患検索機能をご活用ください。", "")
-    ]
-    
-    for form in sample_forms:
-        cursor.execute("SELECT COUNT(*) FROM forms WHERE title = %s", (form[0],))
-        if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO forms (title, main, post_img) VALUES (%s, %s, %s)", form)
-    
-    # CTプロトコルサンプルデータ
-    sample_protocols = [
-        ("頭部", "頭部単純CT", "スライス厚: 5mm\n電圧: 120kV\n電流: 250mA", ""),
-        ("胸部", "胸部造影CT", "スライス厚: 1mm\n電圧: 120kV\n造影剤: 100ml", "")
-    ]
-    
-    for protocol in sample_protocols:
-        cursor.execute("SELECT COUNT(*) FROM protocols WHERE title = %s AND category = %s", (protocol[1], protocol[0]))
-        if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO protocols (category, title, content, protocol_img) VALUES (%s, %s, %s, %s)", protocol)
-    
-    conn.commit()
-    conn.close()
+    try:
+        conn = init_connection()
+        if not conn:
+            st.warning("データベース接続なし、サンプルデータ作成をスキップ")
+            return
+        
+        cursor = conn.cursor()
+        
+        # サンプルユーザーデータ
+        sample_users = [
+            ("管理者", "admin@hospital.jp", "Okiyoshi1126"),
+            ("技師", "tech@hospital.jp", "Tech123")
+        ]
+        
+        try:
+            for user_data in sample_users:
+                cursor.execute("SELECT COUNT(*) FROM users WHERE email = %s", (user_data[1],))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
+                                  (user_data[0], user_data[1], hash_password(user_data[2])))
+        except Exception as e:
+            st.warning(f"ユーザーデータ作成スキップ: {e}")
+        
+        # 疾患サンプルデータ
+        sample_sicks = [
+            ("脳梗塞", "脳血管が詰まる疾患", "脳梗塞,stroke", "頭部造影CT", "造影剤使用", "緊急検査", "迅速な対応", "あり", "造影剤注入", "", "", "", ""),
+            ("肺炎", "肺の感染症", "肺炎,pneumonia", "胸部CT", "単純CT", "標準撮影", "呼吸停止", "なし", "造影不要", "", "", "", "")
+        ]
+        
+        try:
+            for sick in sample_sicks:
+                cursor.execute("SELECT COUNT(*) FROM sicks WHERE diesease = %s", (sick[0],))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute('''
+                        INSERT INTO sicks (
+                            diesease, diesease_text, keyword, protocol, protocol_text,
+                            processing, processing_text, contrast, contrast_text,
+                            diesease_img, protocol_img, processing_img, contrast_img
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ''', sick)
+        except Exception as e:
+            st.warning(f"疾患データ作成スキップ: {e}")
+        
+        # お知らせサンプルデータ
+        sample_forms = [
+            ("システム運用開始", "CT医療システムの運用を開始しました。", ""),
+            ("利用方法について", "疾患検索機能をご活用ください。", "")
+        ]
+        
+        try:
+            for form in sample_forms:
+                cursor.execute("SELECT COUNT(*) FROM forms WHERE title = %s", (form[0],))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("INSERT INTO forms (title, main, post_img) VALUES (%s, %s, %s)", form)
+        except Exception as e:
+            st.warning(f"お知らせデータ作成スキップ: {e}")
+        
+        # CTプロトコルサンプルデータ
+        sample_protocols = [
+            ("頭部", "頭部単純CT", "スライス厚: 5mm\n電圧: 120kV\n電流: 250mA", ""),
+            ("胸部", "胸部造影CT", "スライス厚: 1mm\n電圧: 120kV\n造影剤: 100ml", "")
+        ]
+        
+        try:
+            for protocol in sample_protocols:
+                cursor.execute("SELECT COUNT(*) FROM protocols WHERE title = %s AND category = %s", (protocol[1], protocol[0]))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute("INSERT INTO protocols (category, title, content, protocol_img) VALUES (%s, %s, %s, %s)", protocol)
+        except Exception as e:
+            st.warning(f"プロトコルデータ作成スキップ: {e}")
+        
+        conn.commit()
+        st.success("✅ サンプルデータ作成完了")
+        
+    except Exception as e:
+        st.error(f"❌ サンプルデータ作成エラー: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 # 認証機能
 def hash_password(password):
@@ -2855,36 +2880,27 @@ def show_sidebar():
 def main():
     """メイン処理"""
     # データベース初期化
-    init_database()
-      # 既存ユーザーを一度クリア（一回だけ実行）
-    # conn = init_connection()
-    # cursor = conn.cursor()
-    # cursor.execute("DELETE FROM users")
-    # conn.commit()
-    # conn.close()
-    insert_sample_data()
+    try:
+        init_database()
+        insert_sample_data()
+    except Exception as e:
+        st.error(f"データベース初期化エラー: {e}")
+        st.warning("一部機能が制限される場合があります")
     
-
-      # セッション状態の復元（ブラウザ更新対応）
-    if 'user' not in st.session_state:
-        # データベースからセッション情報を復元を試行
-        session_data = load_session_from_db()
-        if session_data:
-            st.session_state.user = session_data['user']
-            st.session_state.page = session_data['page']
-            # デバッグ情報を表示
     # セッション状態の復元（ブラウザ更新対応）
     if 'user' not in st.session_state:
         # データベースからセッション情報を復元を試行
-        session_data = load_session_from_db()
-        if session_data:
-            st.session_state.user = session_data['user']
-            st.session_state.page = session_data['page']
+        try:
+            session_data = load_session_from_db()
+            if session_data:
+                st.session_state.user = session_data['user']
+                st.session_state.page = session_data['page']
+        except:
+            pass  # セッション復元失敗は無視
     
     # ページ状態の初期化
     if 'page' not in st.session_state:
-        st.session_state.page = "welcome"
-    
+        st.session_state.page = "welcome"    
     # サイドバー表示
     if st.session_state.page != "welcome" and st.session_state.page != "login":
         show_sidebar()
