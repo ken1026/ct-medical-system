@@ -38,23 +38,16 @@ def save_session_to_db(user_id, session_data):
         conn = init_connection()
         cursor = conn.cursor()
         
-        # セッションテーブルが存在しない場合は作成
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_sessions (
-                user_id INTEGER PRIMARY KEY,
-                session_data TEXT,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
         session_json = json.dumps(session_data)
         cursor.execute('''
-            INSERT OR REPLACE INTO user_sessions (user_id, session_data, last_updated)
-            VALUES (?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO user_sessions (user_id, session_data, last_updated)
+            VALUES (%s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id) DO UPDATE SET
+            session_data = EXCLUDED.session_data,
+            last_updated = EXCLUDED.last_updated
         ''', (user_id, session_json))
         
         conn.commit()
-        print(f"セッション保存成功: ユーザーID={user_id}, データ={session_json}")  # デバッグ
         conn.close()
         return True
     except Exception as e:
@@ -66,18 +59,21 @@ def load_session_from_db():
         conn = init_connection()
         cursor = conn.cursor()
         
-        # セッションテーブルが存在するかチェック
+        # PostgreSQL用のテーブル存在チェック
         cursor.execute('''
-            SELECT name FROM sqlite_master WHERE type='table' AND name='user_sessions'
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'user_sessions'
+            )
         ''')
-        if not cursor.fetchone():
+        if not cursor.fetchone()[0]:
             conn.close()
             return None
         
         # 最新のセッション情報を取得（過去24時間以内）
         cursor.execute('''
             SELECT user_id, session_data FROM user_sessions
-            WHERE datetime(last_updated) > datetime('now', '-1 day')
+            WHERE last_updated > NOW() - INTERVAL '1 day'
             ORDER BY last_updated DESC LIMIT 1
         ''')
         
@@ -368,73 +364,78 @@ def init_database():
     
     cursor = conn.cursor()
     
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            userid TEXT,
-            password TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    try:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                userid TEXT,
+                password TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
-      # セッション保存用テーブル
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_sessions (
-            user_id INTEGER PRIMARY KEY,
-            session_data TEXT,
-            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS sicks (
-            id SERIAL PRIMARY KEY,
-            diesease TEXT NOT NULL,
-            diesease_text TEXT NOT NULL,
-            keyword TEXT,
-            protocol TEXT,
-            protocol_text TEXT,
-            processing TEXT,
-            processing_text TEXT,
-            contrast TEXT,
-            contrast_text TEXT,
-            diesease_img TEXT,
-            protocol_img TEXT,
-            processing_img TEXT,
-            contrast_img TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS forms (
-            id SERIAL PRIMARY KEY,
-            title TEXT,
-            main TEXT,
-            post_img TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                user_id INTEGER UNIQUE,
+                session_data TEXT,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS sicks (
+                id SERIAL PRIMARY KEY,
+                diesease TEXT NOT NULL,
+                diesease_text TEXT NOT NULL,
+                keyword TEXT,
+                protocol TEXT,
+                protocol_text TEXT,
+                processing TEXT,
+                processing_text TEXT,
+                contrast TEXT,
+                contrast_text TEXT,
+                diesease_img TEXT,
+                protocol_img TEXT,
+                processing_img TEXT,
+                contrast_img TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS forms (
+                id SERIAL PRIMARY KEY,
+                title TEXT,
+                main TEXT,
+                post_img TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS protocols (
-            id SERIAL PRIMARY KEY,
-            category TEXT NOT NULL,
-            title TEXT NOT NULL,
-            content TEXT NOT NULL,
-            protocol_img TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS protocols (
+                id SERIAL PRIMARY KEY,
+                category TEXT NOT NULL,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                protocol_img TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        conn.commit()
+        
+    except Exception as e:
+        st.error(f"テーブル作成エラー: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
 
 # 初期データ投入
 def insert_sample_data():
@@ -449,27 +450,26 @@ def insert_sample_data():
     ]
     
     for user_data in sample_users:
-        cursor.execute("SELECT COUNT(*) FROM users WHERE email = ?", (user_data[1],))
+        cursor.execute("SELECT COUNT(*) FROM users WHERE email = %s", (user_data[1],))
         if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+            cursor.execute("INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
                           (user_data[0], user_data[1], hash_password(user_data[2])))
     
-    # 疾患サンプルデータ（修正版）
+    # 疾患サンプルデータ
     sample_sicks = [
         ("脳梗塞", "脳血管が詰まる疾患", "脳梗塞,stroke", "頭部造影CT", "造影剤使用", "緊急検査", "迅速な対応", "あり", "造影剤注入", "", "", "", ""),
         ("肺炎", "肺の感染症", "肺炎,pneumonia", "胸部CT", "単純CT", "標準撮影", "呼吸停止", "なし", "造影不要", "", "", "", "")
     ]
     
     for sick in sample_sicks:
-        cursor.execute("SELECT COUNT(*) FROM sicks WHERE diesease = ?", (sick[0],))
+        cursor.execute("SELECT COUNT(*) FROM sicks WHERE diesease = %s", (sick[0],))
         if cursor.fetchone()[0] == 0:
-            # 修正：全ての列を明示的に指定（idは自動採番のため除外）
             cursor.execute('''
                 INSERT INTO sicks (
                     diesease, diesease_text, keyword, protocol, protocol_text,
                     processing, processing_text, contrast, contrast_text,
                     diesease_img, protocol_img, processing_img, contrast_img
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', sick)
     
     # お知らせサンプルデータ
@@ -479,9 +479,9 @@ def insert_sample_data():
     ]
     
     for form in sample_forms:
-        cursor.execute("SELECT COUNT(*) FROM forms WHERE title = ?", (form[0],))
+        cursor.execute("SELECT COUNT(*) FROM forms WHERE title = %s", (form[0],))
         if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO forms (title, main, post_img) VALUES (?, ?, ?)", form)
+            cursor.execute("INSERT INTO forms (title, main, post_img) VALUES (%s, %s, %s)", form)
     
     # CTプロトコルサンプルデータ
     sample_protocols = [
@@ -490,9 +490,9 @@ def insert_sample_data():
     ]
     
     for protocol in sample_protocols:
-        cursor.execute("SELECT COUNT(*) FROM protocols WHERE title = ? AND category = ?", (protocol[1], protocol[0]))
+        cursor.execute("SELECT COUNT(*) FROM protocols WHERE title = %s AND category = %s", (protocol[1], protocol[0]))
         if cursor.fetchone()[0] == 0:
-            cursor.execute("INSERT INTO protocols (category, title, content, protocol_img) VALUES (?, ?, ?, ?)", protocol)
+            cursor.execute("INSERT INTO protocols (category, title, content, protocol_img) VALUES (%s, %s, %s, %s)", protocol)
     
     conn.commit()
     conn.close()
