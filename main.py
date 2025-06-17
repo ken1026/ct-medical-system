@@ -35,7 +35,7 @@ st.set_page_config(
 def save_session_to_db(user_id, session_data):
     """セッション情報をデータベースに保存"""
     try:
-        conn = init_connection()
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         session_json = json.dumps(session_data)
@@ -56,7 +56,7 @@ def save_session_to_db(user_id, session_data):
 def load_session_from_db():
     """データベースからセッション情報を復元"""
     try:
-        conn = init_connection()
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         # PostgreSQL用のテーブル存在チェック
@@ -103,7 +103,7 @@ def load_session_from_db():
 def get_user_by_id(user_id):
     """IDでユーザー情報を取得"""
     try:
-        conn = init_connection()
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id, name, email FROM users WHERE id = ?", (user_id,))
         user = cursor.fetchone()
@@ -339,25 +339,33 @@ def validate_and_process_image(uploaded_file):
     except Exception as e:
         return None, f"無効な画像ファイルです: {str(e)}"
 
-# データベース初期化
-@st.cache_resource
-def init_connection():
-    """PostgreSQL接続を初期化"""
+def get_db_connection():
+    """新しいPostgreSQL接続を取得"""
     try:
-        conn = psycopg2.connect(**st.secrets["postgres"])
-        # 接続テスト
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        cursor.close()
-        st.success("✅ PostgreSQL接続成功")
-        return conn
+        return psycopg2.connect(**st.secrets["postgres"])
     except Exception as e:
         st.error(f"データベース接続エラー: {e}")
         return None
 
+# データベース初期化
+@st.cache_resource
+def init_connection():
+    """PostgreSQL接続テスト（表示用のみ）"""
+    try:
+        conn = psycopg2.connect(**st.secrets["postgres"])
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.close()
+        conn.close()
+        st.success("✅ PostgreSQL接続成功")
+        return True
+    except Exception as e:
+        st.error(f"データベース接続エラー: {e}")
+        return False
+
 def init_database():
     """PostgreSQLテーブルを初期化"""
-    conn = init_connection()
+    conn = get_db_connection()
     if not conn:
         return
     
@@ -440,7 +448,7 @@ def init_database():
 def insert_sample_data():
     """サンプルデータを挿入"""
     try:
-        conn = init_connection()
+        conn = get_db_connection()
         if not conn:
             st.warning("データベース接続なし、サンプルデータ作成をスキップ")
             return
@@ -528,7 +536,7 @@ def hash_password(password):
 
 def authenticate_user(email, password):
     """ユーザー認証"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, name, email FROM users WHERE email = ? AND password = ?", 
                    (email, hash_password(password)))
@@ -538,7 +546,7 @@ def authenticate_user(email, password):
 
 def register_user(name, email, password):
     """新規ユーザー登録"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute("INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
@@ -553,14 +561,14 @@ def register_user(name, email, password):
 # データベース操作関数
 def get_all_sicks():
     """全疾患データを取得"""
-    conn = init_connection()
+    conn = get_db_connection()
     df = pd.read_sql_query("SELECT * FROM sicks ORDER BY diesease", conn)
     conn.close()
     return df
 
 def search_sicks(search_term):
     """疾患データを検索"""
-    conn = init_connection()
+    conn = get_db_connection()
     query = """
         SELECT * FROM sicks 
         WHERE diesease LIKE ? OR diesease_text LIKE ? OR keyword LIKE ? 
@@ -576,7 +584,7 @@ def search_sicks(search_term):
 
 def get_sick_by_id(sick_id):
     """IDで疾患データを取得"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM sicks WHERE id = ?", (sick_id,))
     sick = cursor.fetchone()
@@ -585,14 +593,14 @@ def get_sick_by_id(sick_id):
 
 def get_all_forms():
     """全お知らせを取得"""
-    conn = init_connection()
+    conn = get_db_connection()
     df = pd.read_sql_query("SELECT * FROM forms ORDER BY created_at DESC", conn)
     conn.close()
     return df
 
 def get_form_by_id(form_id):
     """IDでお知らせを取得"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM forms WHERE id = ?", (form_id,))
     form = cursor.fetchone()
@@ -601,7 +609,7 @@ def get_form_by_id(form_id):
 
 def add_sick(diesease, diesease_text, keyword, protocol, protocol_text, processing, processing_text, contrast, contrast_text, diesease_img=None, protocol_img=None, processing_img=None, contrast_img=None):
     """新しい疾患データを追加"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO sicks (diesease, diesease_text, keyword, protocol, protocol_text, processing, processing_text, contrast, contrast_text, diesease_img, protocol_img, processing_img, contrast_img)
@@ -612,7 +620,7 @@ def add_sick(diesease, diesease_text, keyword, protocol, protocol_text, processi
 
 def add_form(title, main, post_img=None):
     """新しいお知らせを追加"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('INSERT INTO forms (title, main, post_img) VALUES (?, ?, ?)', (title, main, post_img))
     conn.commit()
@@ -620,7 +628,7 @@ def add_form(title, main, post_img=None):
 
 def update_sick(sick_id, diesease, diesease_text, keyword, protocol, protocol_text, processing, processing_text, contrast, contrast_text, diesease_img=None, protocol_img=None, processing_img=None, contrast_img=None):
     """疾患データを更新"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE sicks SET diesease=?, diesease_text=?, keyword=?, protocol=?, protocol_text=?, 
@@ -632,7 +640,7 @@ def update_sick(sick_id, diesease, diesease_text, keyword, protocol, protocol_te
 
 def update_form(form_id, title, main, post_img=None):
     """お知らせを更新"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('UPDATE forms SET title=?, main=?, post_img=?, updated_at=CURRENT_TIMESTAMP WHERE id=?', (title, main, post_img, form_id))
     conn.commit()
@@ -640,7 +648,7 @@ def update_form(form_id, title, main, post_img=None):
 
 def delete_form(form_id):
     """お知らせを削除"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM forms WHERE id = ?', (form_id,))
     conn.commit()
@@ -648,7 +656,7 @@ def delete_form(form_id):
 
 def delete_sick(sick_id):
     """疾患データを削除"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM sicks WHERE id = ?', (sick_id,))
     conn.commit()
@@ -656,21 +664,21 @@ def delete_sick(sick_id):
 
 def get_all_protocols():
     """全CTプロトコルを取得"""
-    conn = init_connection()
+    conn = get_db_connection()
     df = pd.read_sql_query("SELECT * FROM protocols ORDER BY category, title", conn)
     conn.close()
     return df
 
 def get_protocols_by_category(category):
     """カテゴリー別CTプロトコルを取得"""
-    conn = init_connection()
+    conn = get_db_connection()
     df = pd.read_sql_query("SELECT * FROM protocols WHERE category = ? ORDER BY title", conn, params=[category])
     conn.close()
     return df
 
 def search_protocols(search_term):
     """CTプロトコルを検索"""
-    conn = init_connection()
+    conn = get_db_connection()
     query = """
         SELECT * FROM protocols 
         WHERE title LIKE ? OR content LIKE ? OR category LIKE ?
@@ -684,7 +692,7 @@ def search_protocols(search_term):
 
 def get_protocol_by_id(protocol_id):
     """IDでCTプロトコルを取得"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM protocols WHERE id = ?", (protocol_id,))
     protocol = cursor.fetchone()
@@ -693,7 +701,7 @@ def get_protocol_by_id(protocol_id):
 
 def add_protocol(category, title, content, protocol_img=None):
     """新しいCTプロトコルを追加"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO protocols (category, title, content, protocol_img)
@@ -704,7 +712,7 @@ def add_protocol(category, title, content, protocol_img=None):
 
 def update_protocol(protocol_id, category, title, content, protocol_img=None):
     """CTプロトコルを更新"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE protocols SET category=?, title=?, content=?, protocol_img=?, updated_at=CURRENT_TIMESTAMP
@@ -715,7 +723,7 @@ def update_protocol(protocol_id, category, title, content, protocol_img=None):
 
 def delete_protocol(protocol_id):
     """CTプロトコルを削除"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM protocols WHERE id = ?', (protocol_id,))
     conn.commit()
@@ -723,7 +731,7 @@ def delete_protocol(protocol_id):
 
 def export_all_data():
     """全データをJSONでエクスポート"""
-    conn = init_connection()
+    conn = get_db_connection()
     
     # 全テーブルのデータを取得
     data = {
@@ -861,7 +869,7 @@ How to CT Medical System - データバックアップ
 def restore_from_json(json_data):
     """JSONデータから復元（完全置換モード）"""
     try:
-        conn = init_connection()
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         # 復元開始
@@ -1059,14 +1067,14 @@ def validate_email(email):
 
 def get_all_users():
     """全ユーザー情報を取得（管理者用）"""
-    conn = init_connection()
+    conn = get_db_connection()
     df = pd.read_sql_query("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC", conn)
     conn.close()
     return df
 
 def delete_user(user_id):
     """ユーザーを削除（管理者用）"""
-    conn = init_connection()
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
     conn.commit()
@@ -1134,7 +1142,7 @@ def show_login_page():
                         
                         # 保存されたセッションを確認
                         try:
-                            conn = init_connection()
+                            conn = get_db_connection()
                             cursor = conn.cursor()
                             cursor.execute("SELECT COUNT(*) FROM user_sessions WHERE user_id = ?", (user[0],))
                             count = cursor.fetchone()[0]
@@ -1830,7 +1838,7 @@ def show_create_disease_page():
             if st.button("👁️ 作成した疾患を確認", key="create_success_view_created", use_container_width=True):
                 # 作成した疾患の詳細ページに移動
                 # 最新の疾患データを取得
-                conn = init_connection()
+                conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("SELECT id FROM sicks WHERE diesease = ? ORDER BY created_at DESC LIMIT 1", 
                               (st.session_state.get('created_disease_name', ''),))
@@ -2357,7 +2365,7 @@ def show_create_protocol_page():
         with col3:
             if st.button("👁️ 作成したプロトコルを確認", key="create_protocol_success_view", use_container_width=True):
                 # 作成したプロトコル詳細ページに移動
-                conn = init_connection()
+                conn = get_db_connection()
                 cursor = conn.cursor()
                 cursor.execute("SELECT id FROM protocols WHERE title = ? AND category = ? ORDER BY created_at DESC LIMIT 1", 
                               (st.session_state.get('created_protocol_title', ''), st.session_state.get('created_protocol_category', '')))
@@ -2757,7 +2765,7 @@ def show_admin_page():
         
         try:
             # データベース統計
-            conn = init_connection()
+            conn = get_db_connection()
             cursor = conn.cursor()
             
             cursor.execute("SELECT COUNT(*) FROM sicks")
@@ -2840,7 +2848,7 @@ def show_sidebar():
                 if 'user' in st.session_state:
                     user_id = st.session_state.user['id']
                     try:
-                        conn = init_connection()
+                        conn = get_db_connection()
                         cursor = conn.cursor()
                         cursor.execute('DELETE FROM user_sessions WHERE user_id = ?', (user_id,))
                         conn.commit()
@@ -2878,6 +2886,9 @@ def show_sidebar():
 # メイン処理
 def main():
     """メイン処理"""
+    # データベース接続テスト
+    init_connection()
+    
     # データベース初期化
     try:
         init_database()
