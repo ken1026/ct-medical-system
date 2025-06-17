@@ -2867,21 +2867,22 @@ def show_sidebar():
             st.markdown("---")
             
             if st.button("🚪 ログアウト", use_container_width=True):
-                # ログアウト時にセッション情報をクリア
-                if 'user' in st.session_state:
-                    user_id = st.session_state.user['id']
-                    try:
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        cursor.execute('DELETE FROM user_sessions WHERE user_id = ?', (user_id,))
-                        conn.commit()
-                        conn.close()
-                    except:
-                        pass
-                for key in list(st.session_state.keys()):
-                    del st.session_state[key]
-                st.session_state.page = "welcome"
-                st.rerun()
+              # ログアウト時にセッション情報をクリア
+              if 'user' in st.session_state:
+                  user_id = st.session_state.user['id']
+                  try:
+                      conn = get_db_connection()
+                      cursor = conn.cursor()
+                      cursor.execute('DELETE FROM user_sessions WHERE user_id = %s', (user_id,))
+                      conn.commit()
+                      cursor.close()
+                      conn.close()
+                  except:
+                      pass
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.session_state.page = "welcome"
+            st.rerun()
 
             # 管理者メニュー（管理者のみ表示）
             if is_admin_user():
