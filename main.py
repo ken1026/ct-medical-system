@@ -2013,25 +2013,10 @@ def show_login_page():
                 if email and password:
                     user = authenticate_user(email, password)
                     if user:
-    			# セッション状態を完全にクリア
-    			for key in list(st.session_state.keys()):
-        		    if key != 'db_initialized':
-                                del st.session_state[key]
-    
-    			# ユーザー情報を設定
-    			st.session_state.user = {
-        		    'id': user[0],
-                            'name': user[1],
-                            'email': user[2]
-                        }
-    			st.session_state.page = "home"
-    
-    			# セッション情報をDBに保存
-    			session_data = {'page': 'home'}
-    			save_session_to_db(user[0], session_data)
-    
-    			st.success(f"ログインしました - {user[1]}さん")
-    			st.rerun()
+                        st.session_state.user = {'id': user[0], 'name': user[1], 'email': user[2]}
+                        st.session_state.page = "home"
+                        st.success(f"ログインしました - {user[1]}さん")
+                        st.rerun()
                     else:
                         st.error("メールアドレスまたはパスワードが間違っています")
                 else:
