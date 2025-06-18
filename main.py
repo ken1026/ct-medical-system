@@ -1282,20 +1282,19 @@ def show_create_notice_page():
         
         if submitted:
             if title and main:
-                try:
-                    # 画像をBase64に変換
-                    notice_img_b64 = None
-                    if notice_image is not None:
-                        notice_img_b64, error_msg = validate_and_process_image(notice_image)
-                        if notice_img_b64 is None:
-                            st.error(f"お知らせ画像: {error_msg}")
-                            return
-                    
-                    add_form(title, main, notice_img_b64)
-                    # キャッシュをクリアして最新データを取得
-                    get_all_forms.clear()
-                    st.success("お知らせを登録しました")
-                    navigate_to_page("notices")
+                    try:
+                        # 画像をBase64に変換
+                        notice_img_b64 = None
+                        if notice_image is not None:
+                            notice_img_b64, error_msg = validate_and_process_image(notice_image)
+                            if notice_img_b64 is None:
+                                st.error(f"お知らせ画像: {error_msg}")
+                                return
+                        
+                        add_form(title, main, notice_img_b64)
+                        get_all_forms.clear()
+                        st.success("お知らせを登録しました")
+                        navigate_to_page("notices")
                     
                 except Exception as e:
                     st.error(f"データの保存中にエラーが発生しました: {str(e)}")
