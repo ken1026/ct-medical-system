@@ -31,6 +31,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+query_params = st.query_params
+if 'page' in query_params:
+    st.session_state.page = query_params['page']
+
 def save_session_to_db(user_id, session_data):
     """セッション情報をデータベースに保存"""
     try:
@@ -154,6 +158,7 @@ def navigate_to_page(page):
     """ページナビゲーション（履歴付き）"""
     add_to_page_history(st.session_state.get('page', 'home'))
     st.session_state.page = page
+    st.query_params['page'] = page  
     st.rerun()
 
 # カスタムCSS
@@ -866,6 +871,7 @@ def show_welcome_page():
                 if key != 'db_initialized':  # DB初期化状態は保持
                     del st.session_state[key]
             st.session_state.page = "login"
+            st.query_params['page'] = "login"
             st.rerun()
 
 def show_login_page():
@@ -887,6 +893,7 @@ def show_login_page():
                     if user:
                         st.session_state.user = {'id': user[0], 'name': user[1], 'email': user[2]}
                         st.session_state.page = "home"
+			st.query_params['page'] = "home"
                         st.success(f"ログインしました - {user[1]}さん")
                         st.rerun()
                     else:
@@ -1712,6 +1719,8 @@ def show_sidebar():
                     if key != 'db_initialized':  # DB初期化状態は保持
                         del st.session_state[key]
                 st.session_state.page = "welcome"
+                st.query_params.clear()             
+                st.query_params['page'] = "welcome"
                 st.rerun()
 
             # 管理者メニュー（管理者のみ表示）
