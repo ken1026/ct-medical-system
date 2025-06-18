@@ -1256,57 +1256,53 @@ def show_notice_detail_page():
             del st.session_state.selected_notice_id
         navigate_to_page("notices")
 def show_create_notice_page():
-    """お知らせ作成ページ"""
-    st.markdown('<div class="main-header"><h1>新規お知らせ作成</h1></div>', unsafe_allow_html=True)
-    
-    with st.form("create_notice_form"):
-        title = st.text_input("タイトル *", placeholder="例：新型CT装置導入のお知らせ")
-        
-        # リッチテキストエディタを使用
-        st.markdown("**本文 ***")
-        main = create_rich_text_editor(
-            content="",
-            placeholder="お知らせの内容を入力してください。見出し、太字、色付け、リストなどを使って見やすく作成できます。",
-            key="notice_main_editor",
-            height=400
-        )
-        
-        # お知らせ画像アップロード
-        st.markdown("**添付画像**")
-        notice_image = st.file_uploader("お知らせ画像をアップロード", type=['png', 'jpg', 'jpeg'], key="create_notice_img_upload",
-                                      help="推奨サイズ: 5MB以下、形式: PNG, JPEG, JPG")
-        if notice_image is not None:
-            st.image(notice_image, caption="アップロード予定のお知らせ画像", width=300)
-        
-        submitted = st.form_submit_button("登録", use_container_width=True)
-        
-        if submitted:
-            if title and main:
-                try:
-                    # 画像処理（既存画像を保持するか新しい画像に更新するか）
-                    notice_img_b64 = form_data[3]  # 既存画像
-                    
-                    # 新しい画像がアップロードされた場合のみ更新
-                    if notice_image is not None:
-                        notice_img_b64, error_msg = validate_and_process_image(notice_image)
-                        if notice_img_b64 is None:
-                            st.error(f"お知らせ画像: {error_msg}")
-                            return
-                    
-                    update_form(st.session_state.edit_notice_id, title, main, notice_img_b64)
-                    get_all_forms.clear()
-                    st.success("お知らせを更新しました")
-                    st.session_state.selected_notice_id = st.session_state.edit_notice_id
-                    del st.session_state.edit_notice_id
-                    navigate_to_page("notice_detail")
-                    
-                except Exception as e:
-                    st.error(f"データの保存中にエラーが発生しました: {str(e)}")
-            else:
-                st.error("タイトルと本文は必須項目です")
-    
-    if st.button("戻る", key="create_notice_back_from_create"):
-        navigate_to_page("notices")
+   """お知らせ作成ページ"""
+   st.markdown('<div class="main-header"><h1>新規お知らせ作成</h1></div>', unsafe_allow_html=True)
+   
+   with st.form("create_notice_form"):
+       title = st.text_input("タイトル *", placeholder="例：新型CT装置導入のお知らせ")
+       
+       # リッチテキストエディタを使用
+       st.markdown("**本文 ***")
+       main = create_rich_text_editor(
+           content="",
+           placeholder="お知らせの内容を入力してください。見出し、太字、色付け、リストなどを使って見やすく作成できます。",
+           key="notice_main_editor",
+           height=400
+       )
+       
+       # お知らせ画像アップロード
+       st.markdown("**添付画像**")
+       notice_image = st.file_uploader("お知らせ画像をアップロード", type=['png', 'jpg', 'jpeg'], key="create_notice_img_upload",
+                                     help="推奨サイズ: 5MB以下、形式: PNG, JPEG, JPG")
+       if notice_image is not None:
+           st.image(notice_image, caption="アップロード予定のお知らせ画像", width=300)
+       
+       submitted = st.form_submit_button("登録", use_container_width=True)
+       
+       if submitted:
+           if title and main:
+               try:
+                   # 画像をBase64に変換
+                   notice_img_b64 = None
+                   if notice_image is not None:
+                       notice_img_b64, error_msg = validate_and_process_image(notice_image)
+                       if notice_img_b64 is None:
+                           st.error(f"お知らせ画像: {error_msg}")
+                           return
+                   
+                   add_form(title, main, notice_img_b64)
+                   get_all_forms.clear()
+                   st.success("お知らせを登録しました")
+                   navigate_to_page("notices")
+                   
+               except Exception as e:
+                   st.error(f"データの保存中にエラーが発生しました: {str(e)}")
+           else:
+               st.error("タイトルと本文は必須項目です")
+   
+   if st.button("戻る", key="create_notice_back_from_create"):
+       navigate_to_page("notices")
 
 def show_edit_notice_page():
    """お知らせ編集ページ"""
