@@ -1296,8 +1296,8 @@ def show_create_notice_page():
                         st.success("お知らせを登録しました")
                         navigate_to_page("notices")
                     
-                except Exception as e:
-                    st.error(f"データの保存中にエラーが発生しました: {str(e)}")
+                    except Exception as e:
+                      st.error(f"データの保存中にエラーが発生しました: {str(e)}")
             else:
                 st.error("タイトルと本文は必須項目です")
     
