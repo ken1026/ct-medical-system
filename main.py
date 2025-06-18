@@ -1311,11 +1311,11 @@ def show_edit_notice_page():
     form_data = get_form_by_id(st.session_state.edit_notice_id)
     if not form_data:
         st.error("お知らせが見つかりません")
-         if st.button("お知らせ一覧に戻る", key="edit_notice_back_not_found"):
+        if st.button("お知らせ一覧に戻る", key="edit_notice_back_not_found"):
             if 'edit_notice_id' in st.session_state:
                 del st.session_state.edit_notice_id
             navigate_to_page("notices")
-        return    
+        return
     st.markdown('<div class="main-header"><h1>お知らせ編集</h1></div>', unsafe_allow_html=True)
     
     with st.form("edit_notice_form"):
