@@ -1305,20 +1305,17 @@ def show_edit_notice_page():
     if 'edit_notice_id' not in st.session_state:
         st.error("編集対象が選択されていません")
         if st.button("お知らせ一覧に戻る", key="edit_notice_back_no_selection"):
-            st.session_state.page = "notices"
-            st.rerun()
+            navigate_to_page("notices")
         return
     
     form_data = get_form_by_id(st.session_state.edit_notice_id)
     if not form_data:
         st.error("お知らせが見つかりません")
-        if st.button("お知らせ一覧に戻る", key="edit_notice_back_not_found"):
-            st.session_state.page = "notices"
+         if st.button("お知らせ一覧に戻る", key="edit_notice_back_not_found"):
             if 'edit_notice_id' in st.session_state:
                 del st.session_state.edit_notice_id
-            st.rerun()
-        return
-    
+            navigate_to_page("notices")
+        return    
     st.markdown('<div class="main-header"><h1>お知らせ編集</h1></div>', unsafe_allow_html=True)
     
     with st.form("edit_notice_form"):
@@ -1372,9 +1369,8 @@ def show_edit_notice_page():
                     update_form(st.session_state.edit_notice_id, title, main, notice_img_b64)
                     st.success("お知らせを更新しました")
                     st.session_state.selected_notice_id = st.session_state.edit_notice_id
-                    st.session_state.page = "notice_detail"
                     del st.session_state.edit_notice_id
-                    st.rerun()
+                    navigate_to_page("notice_detail")
                     
                 except Exception as e:
                     st.error(f"データの保存中にエラーが発生しました: {str(e)}")
@@ -1383,9 +1379,8 @@ def show_edit_notice_page():
         
         if cancel:
             st.session_state.selected_notice_id = st.session_state.edit_notice_id
-            st.session_state.page = "notice_detail"
             del st.session_state.edit_notice_id
-            st.rerun()
+            navigate_to_page("notice_detail")
 
 def show_create_disease_page():
     """疾患データ作成ページ"""
