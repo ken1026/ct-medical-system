@@ -1621,40 +1621,404 @@ def show_edit_disease_page():
         st.rerun()
 
 def show_protocols_page():
-    """CTプロトコル一覧ページ（簡易版）"""
-    st.markdown('<div class="main-header"><h1>CTプロトコル管理</h1></div>', unsafe_allow_html=True)
-    st.info("CTプロトコル機能は今後追加予定です。")
+    """CTプロトコル一覧ページ"""
+    st.markdown('<div class="main-header"><h1>📋 CTプロトコル管理</h1></div>', unsafe_allow_html=True)
     
-    if st.button("ホームに戻る", key="protocols_back_to_home"):
-        st.session_state.page = "home"
+    # カテゴリー定義
+    categories = ["頭部", "頸部", "胸部", "腹部", "下肢", "上肢", "特殊"]
+    
+    # 新規作成・検索ボタン
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("新規プロトコル作成", key="protocols_create_new"):
+            navigate_to_page("create_protocol")
+    with col2:
+        # 検索フォーム
+        with st.form("protocol_search_form"):
+            search_term = st.text_input("プロトコル検索", placeholder="タイトル、内容、カテゴリーで検索")
+            search_submitted = st.form_submit_button("🔍 検索")
+    
+    # 検索結果表示
+    if search_submitted and search_term:
+        df = search_protocols(search_term)
+        st.session_state.protocol_search_results = df
         st.rerun()
+    
+    if 'protocol_search_results' in st.session_state:
+        df = st.session_state.protocol_search_results
+        if not df.empty:
+            st.success(f"{len(df)}件の検索結果が見つかりました")
+            
+            for idx, row in df.iterrows():
+                st.markdown(f'<div class="search-result">', unsafe_allow_html=True)
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.markdown(f"**[{row['category']}] {row['title']}**")
+                    preview_text = row['content'][:150] + "..." if len(str(row['content'])) > 150 else row['content']
+                    display_rich_content(preview_text)
+                    st.caption(f"更新日: {row['updated_at']}")
+                
+                with col2:
+                    if st.button("詳細", key=f"search_protocol_detail_{row['id']}"):
+                        st.session_state.selected_protocol_id = int(row['id'])
+                        navigate_to_page("protocol_detail")
+                
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            if st.button("検索結果をクリア", key="clear_protocol_search"):
+                if 'protocol_search_results' in st.session_state:
+                    del st.session_state.protocol_search_results
+                st.rerun()
+        else:
+            st.info("該当するプロトコルが見つかりませんでした")
+            if st.button("検索結果をクリア", key="clear_no_protocol_results"):
+                if 'protocol_search_results' in st.session_state:
+                    del st.session_state.protocol_search_results
+                st.rerun()
+        return
+    
+    # カテゴリータブ表示
+    tabs = st.tabs(categories)
+    
+    for i, category in enumerate(categories):
+        with tabs[i]:
+            df = get_protocols_by_category(category)
+            
+            if not df.empty:
+                for idx, row in df.iterrows():
+                    st.markdown('<div class="protocol-section">', unsafe_allow_html=True)
+                    col1, col2 = st.columns([4, 1])
+                    
+                    with col1:
+                        st.markdown(f"### {row['title']}")
+                        preview_text = row['content'][:200] + "..." if len(str(row['content'])) > 200 else row['content']
+                        display_rich_content(preview_text)
+                        st.caption(f"作成日: {row['created_at']} | 更新日: {row['updated_at']}")
+                    
+                    with col2:
+                        if st.button("詳細", key=f"protocol_detail_{row['id']}"):
+                            st.session_state.selected_protocol_id = row['id']
+                            navigate_to_page("protocol_detail")
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
+            else:
+                st.info(f"{category}のプロトコルはまだ登録されていません")
+                if st.button(f"{category}のプロトコルを作成", key=f"create_{category}_protocol"):
+                    st.session_state.default_category = category
+                    navigate_to_page("create_protocol")
 
 def show_protocol_detail_page():
-    """CTプロトコル詳細ページ（簡易版）"""
-    st.markdown('<div class="main-header"><h1>CTプロトコル詳細</h1></div>', unsafe_allow_html=True)
-    st.info("CTプロトコル詳細機能は今後追加予定です。")
+    """CTプロトコル詳細ページ"""
+    if 'selected_protocol_id' not in st.session_state:
+        st.error("プロトコルが選択されていません")
+        if st.button("プロトコル一覧に戻る", key="protocol_detail_back_no_selection"):
+            navigate_to_page("protocols")
+        return
     
-    if st.button("プロトコル一覧に戻る", key="protocol_detail_back"):
-        st.session_state.page = "protocols"
-        st.rerun()
+    protocol_data = get_protocol_by_id(st.session_state.selected_protocol_id)
+    if not protocol_data:
+        st.error("プロトコルが見つかりません")
+        if st.button("プロトコル一覧に戻る", key="protocol_detail_back_not_found"):
+            if 'selected_protocol_id' in st.session_state:
+                del st.session_state.selected_protocol_id
+            navigate_to_page("protocols")
+        return
+    
+    st.markdown(f'<div class="main-header"><h1>📋 {protocol_data[2]}</h1></div>', unsafe_allow_html=True)
+    
+    # カテゴリーバッジ
+    st.markdown(f"""
+    <div style="margin-bottom: 1rem;">
+        <span style="background-color: #2196F3; color: white; padding: 0.3rem 0.8rem; border-radius: 15px; font-size: 0.9rem;">
+            📂 {protocol_data[1]}
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 作成日・更新日
+    col1, col2 = st.columns(2)
+    with col1:
+        st.caption(f"作成日: {protocol_data[5]}")
+    with col2:
+        st.caption(f"更新日: {protocol_data[6]}")
+    
+    # プロトコル内容
+    st.markdown('<div class="protocol-section">', unsafe_allow_html=True)
+    st.markdown("### プロトコル内容")
+    display_rich_content(protocol_data[3])
+    
+    # プロトコル画像表示
+    if protocol_data[4]:  # protocol_img
+        st.markdown("### 📷 プロトコル画像")
+        display_image_with_caption(protocol_data[4], "プロトコル画像")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 編集・削除・戻るボタン
+    if st.button("編集", key="protocol_detail_edit"):
+        st.session_state.edit_protocol_id = protocol_data[0]
+        navigate_to_page("edit_protocol")
+    
+    if st.button("削除", key="protocol_detail_delete"):
+        if st.session_state.get('confirm_delete_protocol', False):
+            delete_protocol(protocol_data[0])
+            get_all_protocols.clear()  # キャッシュクリア
+            st.success("プロトコルを削除しました")
+            if 'confirm_delete_protocol' in st.session_state:
+                del st.session_state.confirm_delete_protocol
+            if 'selected_protocol_id' in st.session_state:
+                del st.session_state.selected_protocol_id
+            navigate_to_page("protocols")
+        else:
+            st.session_state.confirm_delete_protocol = True
+            st.warning("削除ボタンをもう一度押すと削除されます")
+    
+    if st.button("⬅️ 戻る", key="protocol_detail_back"):
+        if 'selected_protocol_id' in st.session_state:
+            del st.session_state.selected_protocol_id
+        go_back()
 
 def show_create_protocol_page():
-    """CTプロトコル作成ページ（簡易版）"""
+    """CTプロトコル作成ページ"""
     st.markdown('<div class="main-header"><h1>新規CTプロトコル作成</h1></div>', unsafe_allow_html=True)
-    st.info("CTプロトコル作成機能は今後追加予定です。")
     
-    if st.button("プロトコル一覧に戻る", key="create_protocol_back"):
-        st.session_state.page = "protocols"
-        st.rerun()
+    # カテゴリー定義
+    categories = ["頭部", "頸部", "胸部", "腹部", "下肢", "上肢", "特殊"]
+    
+    with st.form("create_protocol_form"):
+        # カテゴリー選択
+        default_index = 0
+        if 'default_category' in st.session_state:
+            try:
+                default_index = categories.index(st.session_state.default_category)
+            except ValueError:
+                default_index = 0
+        
+        category = st.selectbox("カテゴリー *", categories, index=default_index)
+        
+        # タイトル入力
+        title = st.text_input("プロトコルタイトル *", placeholder="例：頭部単純CT撮影プロトコル")
+        
+        # プロトコル内容
+        st.markdown("**プロトコル内容 ***")
+        content = create_rich_text_editor(
+            content="",
+            placeholder="CTプロトコルの詳細内容を入力してください。撮影条件、手順、注意事項などを記載できます。",
+            key="protocol_content_editor",
+            height=400
+        )
+        
+        # プロトコル画像
+        st.markdown("**プロトコル画像**")
+        protocol_image = st.file_uploader("プロトコル画像をアップロード", type=['png', 'jpg', 'jpeg'], 
+                                        key="create_protocol_img_upload",
+                                        help="対応形式: PNG, JPEG, JPG（最大5MB）")
+        if protocol_image:
+            st.image(protocol_image, caption="プロトコル画像プレビュー", width=300)
+        
+        # フォーム送信
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            submitted = st.form_submit_button("プロトコルを作成", use_container_width=True)
+        with col2:
+            if st.form_submit_button("🔙 戻る", use_container_width=True):
+                if 'default_category' in st.session_state:
+                    del st.session_state.default_category
+                navigate_to_page("protocols")
+    
+    # フォーム処理
+    if submitted:
+        if not title or not content:
+            st.error("タイトルとプロトコル内容は必須項目です")
+        else:
+            try:
+                # 画像をBase64に変換
+                protocol_img_b64 = None
+                if protocol_image is not None:
+                    protocol_img_b64, error_msg = validate_and_process_image(protocol_image)
+                    if protocol_img_b64 is None:
+                        st.error(f"プロトコル画像: {error_msg}")
+                        return
+                
+                add_protocol(category, title, content, protocol_img_b64)
+                get_all_protocols.clear()  # キャッシュクリア
+                
+                # 作成成功フラグを設定
+                st.session_state.protocol_created = True
+                st.session_state.created_protocol_title = title
+                st.session_state.created_protocol_category = category
+                if 'default_category' in st.session_state:
+                    del st.session_state.default_category
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"データ作成中にエラーが発生しました: {str(e)}")
+    
+    # 作成完了メッセージ
+    if st.session_state.get('protocol_created', False):
+        st.success("✅ CTプロトコルが正常に作成されました！")
+        st.balloons()
+        
+        st.markdown(f"""
+        <div class="protocol-section">
+            <h3>📋 作成完了</h3>
+            <p><strong>カテゴリー:</strong> {st.session_state.get('created_protocol_category', '')}</p>
+            <p><strong>タイトル:</strong> {st.session_state.get('created_protocol_title', '')}</p>
+            <p><strong>作成日時:</strong> {datetime.now().strftime('%Y年%m月%d日 %H:%M')}</p>
+            <p>データベースに正常に保存されました。</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 1, 1])
+        
+        with col1:
+            if st.button("プロトコル一覧に戻る", key="create_protocol_success_back", use_container_width=True):
+                # 成功フラグをクリア
+                if 'protocol_created' in st.session_state:
+                    del st.session_state.protocol_created
+                if 'created_protocol_title' in st.session_state:
+                    del st.session_state.created_protocol_title
+                if 'created_protocol_category' in st.session_state:
+                    del st.session_state.created_protocol_category
+                navigate_to_page("protocols")
+        
+        with col2:
+            if st.button("📝 続けて作成", key="create_protocol_success_continue", use_container_width=True):
+                # 成功フラグをクリア
+                if 'protocol_created' in st.session_state:
+                    del st.session_state.protocol_created
+                if 'created_protocol_title' in st.session_state:
+                    del st.session_state.created_protocol_title
+                if 'created_protocol_category' in st.session_state:
+                    del st.session_state.created_protocol_category
+                st.rerun()
+        
+        with col3:
+            if st.button("👁️ 作成したプロトコルを確認", key="create_protocol_success_view", use_container_width=True):
+                # 作成したプロトコル詳細ページに移動
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT id FROM protocols WHERE title = %s AND category = %s ORDER BY created_at DESC LIMIT 1", 
+                              (st.session_state.get('created_protocol_title', ''), st.session_state.get('created_protocol_category', '')))
+                result = cursor.fetchone()
+                conn.close()
+                
+                if result:
+                    st.session_state.selected_protocol_id = result[0]
+                    # 成功フラグをクリア
+                    if 'protocol_created' in st.session_state:
+                        del st.session_state.protocol_created
+                    if 'created_protocol_title' in st.session_state:
+                        del st.session_state.created_protocol_title
+                    if 'created_protocol_category' in st.session_state:
+                        del st.session_state.created_protocol_category
+                    navigate_to_page("protocol_detail")
+        return
+    
+    # 戻るボタン（通常時のみ表示）
+    if st.button("戻る", key="create_protocol_back"):
+        if 'default_category' in st.session_state:
+            del st.session_state.default_category
+        navigate_to_page("protocols")
 
 def show_edit_protocol_page():
-    """CTプロトコル編集ページ（簡易版）"""
-    st.markdown('<div class="main-header"><h1>CTプロトコル編集</h1></div>', unsafe_allow_html=True)
-    st.info("CTプロトコル編集機能は今後追加予定です。")
+    """CTプロトコル編集ページ"""
+    if 'edit_protocol_id' not in st.session_state:
+        st.error("編集対象が選択されていません")
+        if st.button("プロトコル一覧に戻る", key="edit_protocol_back_no_selection"):
+            navigate_to_page("protocols")
+        return
     
-    if st.button("プロトコル一覧に戻る", key="edit_protocol_back"):
-        st.session_state.page = "protocols"
-        st.rerun()
+    protocol_data = get_protocol_by_id(st.session_state.edit_protocol_id)
+    if not protocol_data:
+        st.error("プロトコルが見つかりません")
+        if st.button("プロトコル一覧に戻る", key="edit_protocol_back_not_found"):
+            if 'edit_protocol_id' in st.session_state:
+                del st.session_state.edit_protocol_id
+            navigate_to_page("protocols")
+        return
+    
+    st.markdown('<div class="main-header"><h1>CTプロトコル編集</h1></div>', unsafe_allow_html=True)
+    
+    # カテゴリー定義
+    categories = ["頭部", "頸部", "胸部", "腹部", "下肢", "上肢", "特殊"]
+    
+    with st.form("edit_protocol_form"):
+        # カテゴリー選択
+        try:
+            current_category_index = categories.index(protocol_data[1])
+        except ValueError:
+            current_category_index = 0
+        
+        category = st.selectbox("カテゴリー *", categories, index=current_category_index)
+        
+        # タイトル入力
+        title = st.text_input("プロトコルタイトル *", value=protocol_data[2])
+        
+        # プロトコル内容
+        st.markdown("**プロトコル内容 ***")
+        content = create_rich_text_editor(
+            content=protocol_data[3] or "",
+            placeholder="CTプロトコルの詳細内容を入力してください。",
+            key="edit_protocol_content_editor",
+            height=400
+        )
+        
+        # プロトコル画像編集
+        st.markdown("**プロトコル画像**")
+        if protocol_data[4]:  # 既存画像がある場合
+            st.markdown("現在の画像:")
+            display_image_with_caption(protocol_data[4], "現在のプロトコル画像", width=200)
+            replace_img = st.checkbox("プロトコル画像を変更する")
+            if replace_img:
+                protocol_image = st.file_uploader("新しいプロトコル画像をアップロード", type=['png', 'jpg', 'jpeg'], 
+                                                key="edit_protocol_img_upload")
+                if protocol_image is not None:
+                    st.image(protocol_image, caption="新しいプロトコル画像", width=300)
+            else:
+                protocol_image = None
+        else:
+            protocol_image = st.file_uploader("プロトコル画像をアップロード", type=['png', 'jpg', 'jpeg'], 
+                                            key="edit_protocol_img_upload")
+            if protocol_image is not None:
+                st.image(protocol_image, caption="プロトコル画像", width=300)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            submitted = st.form_submit_button("更新", use_container_width=True)
+        with col2:
+            cancel = st.form_submit_button("キャンセル", use_container_width=True)
+        
+        if submitted:
+            if title and content:
+                try:
+                    # 画像処理（既存画像を保持するか新しい画像に更新するか）
+                    protocol_img_b64 = protocol_data[4]  # 既存画像
+                    
+                    # 新しい画像がアップロードされた場合のみ更新
+                    if protocol_image is not None:
+                        protocol_img_b64, error_msg = validate_and_process_image(protocol_image)
+                        if protocol_img_b64 is None:
+                            st.error(f"プロトコル画像: {error_msg}")
+                            return
+                    
+                    update_protocol(st.session_state.edit_protocol_id, category, title, content, protocol_img_b64)
+                    get_all_protocols.clear()  # キャッシュクリア
+                    st.success("プロトコルを更新しました")
+                    st.session_state.selected_protocol_id = st.session_state.edit_protocol_id
+                    del st.session_state.edit_protocol_id
+                    navigate_to_page("protocol_detail")
+                    
+                except Exception as e:
+                    st.error(f"データの保存中にエラーが発生しました: {str(e)}")
+            else:
+                st.error("タイトルとプロトコル内容は必須項目です")
+        
+        if cancel:
+            st.session_state.selected_protocol_id = st.session_state.edit_protocol_id
+            del st.session_state.edit_protocol_id
+            navigate_to_page("protocol_detail")
 
 # サイドバー関数
 def show_sidebar():
