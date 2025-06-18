@@ -1231,8 +1231,7 @@ def show_notice_detail_page():
     # 編集・削除・戻るボタン（本文下、縦並び）
     if st.button("編集", key="notice_detail_edit_notice"):
         st.session_state.edit_notice_id = form_data[0]
-        st.session_state.page = "edit_notice"
-        st.rerun()
+        navigate_to_page("edit_notice")
     
     if st.button("削除", key="notice_detail_delete_notice"):
         if st.session_state.get('confirm_delete_notice', False):
@@ -1242,18 +1241,15 @@ def show_notice_detail_page():
                 del st.session_state.confirm_delete_notice
             if 'selected_notice_id' in st.session_state:
                 del st.session_state.selected_notice_id
-            st.session_state.page = "notices"
-            st.rerun()
+            navigate_to_page("notices")
         else:
             st.session_state.confirm_delete_notice = True
             st.warning("削除ボタンをもう一度押すと削除されます")
     
     if st.button("戻る", key="notice_detail_back_to_notices"):
-        st.session_state.page = "notices"
         if 'selected_notice_id' in st.session_state:
             del st.session_state.selected_notice_id
-        st.rerun()
-
+        navigate_to_page("notices")
 def show_create_notice_page():
     """お知らせ作成ページ"""
     st.markdown('<div class="main-header"><h1>新規お知らせ作成</h1></div>', unsafe_allow_html=True)
