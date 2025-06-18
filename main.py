@@ -1378,7 +1378,7 @@ def show_edit_notice_page():
                     del st.session_state.edit_notice_id
                     navigate_to_page("notice_detail")
                     
-                 except Exception as e:
+                except Exception as e:
                     st.error(f"データの保存中にエラーが発生しました: {str(e)}")
             else:
                 st.error("タイトルと本文は必須項目です")
