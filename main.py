@@ -1,873 +1,4 @@
-if sick_data[9]:  # contrast_text
-            st.markdown("**造影手順:**")
-            display_rich_content(sick_data[9])
-        else:
-            st.info("造影プロトコルの詳細が未設定です")
-        
-        # 造影プロトコル画像表示
-        if sick_data[13]:  # contrast_img
-            st.markdown("**造影プロトコル画像:**")
-            display_image_with_caption(sick_data[13], "造影プロトコル画像")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with tab4:
-        st.markdown('<div class="processing-section">', unsafe_allow_html=True)
-        if sick_data[6]:  # processing
-            st.markdown(f"### 画像処理: {sick_data[6]}")
-        if sick_data[7]:  # processing_text
-            st.markdown("**処理方法:**")
-            display_rich_content(sick_data[7])
-        else:
-            st.info("画像処理の詳細が未設定です")
-        
-        # 画像処理画像表示
-        if sick_data[12]:  # processing_img
-            st.markdown("**画像処理画像:**")
-            display_image_with_caption(sick_data[12], "画像処理画像")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    # 編集・削除・戻るボタン（タブの下、縦並び）
-    if st.button("編集", key="detail_edit_disease"):
-        st.session_state.edit_sick_id = sick_data[0]
-        st.session_state.page = "edit_disease"
-        st.rerun()
-    
-    if st.button("削除", key="detail_delete_disease"):
-        if st.session_state.get('confirm_delete', False):
-            delete_sick(sick_data[0])
-            st.success("疾患データを削除しました")
-            st.session_state.page = "search"
-            if 'confirm_delete' in st.session_state:
-                del st.session_state.confirm_delete
-            if 'selected_sick_id' in st.session_state:
-                del st.session_state.selected_sick_id
-            st.rerun()
-        else:
-            st.session_state.confirm_delete = True
-            st.warning("削除ボタンをもう一度押すと削除されます")
-    
-    if st.button("検索に戻る", key="detail_back_to_search"):
-        st.session_state.page = "search"
-        if 'selected_sick_id' in st.session_state:
-            del st.session_state.selected_sick_id
-        st.rerun()
-
-def show_notices_page():
-    """お知らせ一覧ページ"""
-    st.markdown('<div class="main-header"><h1>お知らせ一覧</h1></div>', unsafe_allow_html=True)
-    
-    # 新規作成ボタン
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        if st.button("新規お知らせ作成", key="notices_create_notice"):
-            st.session_state.page = "create_notice"
-            st.rerun()
-    
-    df = get_all_forms()
-    if not df.empty:
-        for idx, row in df.iterrows():
-            st.markdown('<div class="notice-card">', unsafe_allow_html=True)
-            col1, col2 = st.columns([4, 1])
-            
-            with col1:
-                st.markdown(f"### {row['title']}")
-                # リッチテキストのプレビュー表示
-                preview_text = row['main'][:200] + "..." if len(str(row['main'])) > 200 else row['main']
-                display_rich_content(preview_text)
-                st.caption(f"作成日: {row['created_at']}")
-            
-            with col2:
-                if st.button("詳細", key=f"notices_detail_{row['id']}"):
-                    st.session_state.selected_notice_id = row['id']
-                    st.session_state.page = "notice_detail"
-                    st.rerun()
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        st.info("お知らせがありません")
-
-def show_notice_detail_page():
-    """お知らせ詳細ページ"""
-    if 'selected_notice_id' not in st.session_state:
-        st.error("お知らせが選択されていません")
-        if st.button("お知らせ一覧に戻る", key="notice_detail_back_no_selection"):
-            st.session_state.page = "notices"
-            st.rerun()
-        return
-    
-    form_data = get_form_by_id(st.session_state.selected_notice_id)
-    if not form_data:
-        st.error("お知らせが見つかりません")
-        if st.button("お知らせ一覧に戻る", key="notice_detail_back_not_found"):
-            st.session_state.page = "notices"
-            if 'selected_notice_id' in st.session_state:
-                del st.session_state.selected_notice_id
-            st.rerun()
-        return
-    
-    st.title(f"{form_data[1]}")
-    
-    st.markdown('<div class="notice-card">', unsafe_allow_html=True)
-    display_rich_content(form_data[2])  # main content をリッチテキストとして表示
-    
-    # お知らせ画像表示
-    if form_data[3]:  # post_img
-        st.markdown("**添付画像:**")
-        display_image_with_caption(form_data[3], "お知らせ画像")
-    
-    st.caption(f"作成日: {form_data[4]}")
-    st.caption(f"更新日: {form_data[5]}")
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # 編集・削除・戻るボタン（本文下、縦並び）
-    if st.button("編集", key="notice_detail_edit_notice"):
-        st.session_state.edit_notice_id = form_data[0]
-        st.session_state.page = "edit_notice"
-        st.rerun()
-    
-    if st.button("削除", key="notice_detail_delete_notice"):
-        if st.session_state.get('confirm_delete_notice', False):
-            delete_form(form_data[0])
-            st.success("お知らせを削除しました")
-            st.session_state.page = "notices"
-            if 'confirm_delete_notice' in st.session_state:
-                del st.session_state.confirm_delete_notice
-            if 'selected_notice_id' in st.session_state:
-                del st.session_state.selected_notice_id
-            st.rerun()
-        else:
-            st.session_state.confirm_delete_notice = True
-            st.warning("削除ボタンをもう一度押すと削除されます")
-    
-    if st.button("戻る", key="notice_detail_back_to_notices"):
-        st.session_state.page = "notices"
-        if 'selected_notice_id' in st.session_state:
-            del st.session_state.selected_notice_id
-        st.rerun()
-
-def show_create_notice_page():
-    """お知らせ作成ページ"""
-    st.markdown('<div class="main-header"><h1>新規お知らせ作成</h1></div>', unsafe_allow_html=True)
-    
-    with st.form("create_notice_form"):
-        title = st.text_input("タイトル *", placeholder="例：新型CT装置導入のお知らせ")
-        
-        # リッチテキストエディタを使用
-        st.markdown("**本文 ***")
-        main = create_rich_text_editor(
-            content="",
-            placeholder="お知らせの内容を入力してください。見出し、太字、色付け、リストなどを使って見やすく作成できます。",
-            key="notice_main_editor",
-            height=400
-        )
-        
-        # お知らせ画像アップロード
-        st.markdown("**添付画像**")
-        notice_image = st.file_uploader("お知らせ画像をアップロード", type=['png', 'jpg', 'jpeg'], key="create_notice_img_upload",
-                                      help="推奨サイズ: 5MB以下、形式: PNG, JPEG, JPG")
-        if notice_image is not None:
-            st.image(notice_image, caption="アップロード予定のお知らせ画像", width=300)
-        
-        submitted = st.form_submit_button("登録", use_container_width=True)
-        
-        if submitted:
-            if title and main:
-                try:
-                    # 画像をBase64に変換
-                    notice_img_b64 = None
-                    if notice_image is not None:
-                        notice_img_b64, error_msg = validate_and_process_image(notice_image)
-                        if notice_img_b64 is None:
-                            st.error(f"お知らせ画像: {error_msg}")
-                            return
-                    
-                    add_form(title, main, notice_img_b64)
-                    st.success("お知らせを登録しました")
-                    st.session_state.page = "notices"
-                    st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"データの保存中にエラーが発生しました: {str(e)}")
-            else:
-                st.error("タイトルと本文は必須項目です")
-    
-    if st.button("戻る", key="create_notice_back_from_create"):
-        st.session_state.page = "notices"
-        st.rerun()
-
-def show_edit_notice_page():
-    """お知らせ編集ページ"""
-    if 'edit_notice_id' not in st.session_state:
-        st.error("編集対象が選択されていません")
-        if st.button("お知らせ一覧に戻る", key="edit_notice_back_no_selection"):
-            st.session_state.page = "notices"
-            st.rerun()
-        return
-    
-    form_data = get_form_by_id(st.session_state.edit_notice_id)
-    if not form_data:
-        st.error("お知らせが見つかりません")
-        if st.button("お知らせ一覧に戻る", key="edit_notice_back_not_found"):
-            st.session_state.page = "notices"
-            if 'edit_notice_id' in st.session_state:
-                del st.session_state.edit_notice_id
-            st.rerun()
-        return
-    
-    st.markdown('<div class="main-header"><h1>お知らせ編集</h1></div>', unsafe_allow_html=True)
-    
-    with st.form("edit_notice_form"):
-        title = st.text_input("タイトル *", value=form_data[1])
-        
-        # リッチテキストエディタを使用（既存データを初期値として設定）
-        st.markdown("**本文 ***")
-        main = create_rich_text_editor(
-            content=form_data[2] or "",
-            placeholder="お知らせの内容を入力してください。見出し、太字、色付け、リストなどを使って見やすく作成できます。",
-            key="edit_notice_main_editor",
-            height=400
-        )
-        
-        # お知らせ画像編集
-        st.markdown("**添付画像**")
-        if form_data[3]:  # 既存画像がある場合
-            st.markdown("現在の画像:")
-            display_image_with_caption(form_data[3], "現在のお知らせ画像", width=200)
-            replace_notice_img = st.checkbox("お知らせ画像を変更する")
-            if replace_notice_img:
-                notice_image = st.file_uploader("新しいお知らせ画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_notice_img_upload")
-                if notice_image is not None:
-                    st.image(notice_image, caption="新しいお知らせ画像", width=300)
-            else:
-                notice_image = None
-        else:
-            notice_image = st.file_uploader("お知らせ画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_notice_img_upload")
-            if notice_image is not None:
-                st.image(notice_image, caption="お知らせ画像", width=300)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            submitted = st.form_submit_button("更新", use_container_width=True)
-        with col2:
-            cancel = st.form_submit_button("キャンセル", use_container_width=True)
-        
-        if submitted:
-            if title and main:
-                try:
-                    # 画像処理（既存画像を保持するか新しい画像に更新するか）
-                    notice_img_b64 = form_data[3]  # 既存画像
-                    
-                    # 新しい画像がアップロードされた場合のみ更新
-                    if notice_image is not None:
-                        notice_img_b64, error_msg = validate_and_process_image(notice_image)
-                        if notice_img_b64 is None:
-                            st.error(f"お知らせ画像: {error_msg}")
-                            return
-                    
-                    update_form(st.session_state.edit_notice_id, title, main, notice_img_b64)
-                    st.success("お知らせを更新しました")
-                    st.session_state.selected_notice_id = st.session_state.edit_notice_id
-                    st.session_state.page = "notice_detail"
-                    del st.session_state.edit_notice_id
-                    st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"データの保存中にエラーが発生しました: {str(e)}")
-            else:
-                st.error("タイトルと本文は必須項目です")
-        
-        if cancel:
-            st.session_state.selected_notice_id = st.session_state.edit_notice_id
-            st.session_state.page = "notice_detail"
-            del st.session_state.edit_notice_id
-            st.rerun()
-
-def show_create_disease_page():
-    """疾患データ作成ページ"""
-    st.markdown('<div class="main-header"><h1>新規疾患データ作成</h1></div>', unsafe_allow_html=True)
-    
-    with st.form("create_disease_form"):
-        # 疾患情報
-        st.markdown("### 📋 疾患情報")
-        disease_name = st.text_input("疾患名 *", placeholder="例：大動脈解離")
-        
-        # リッチテキストエディタで疾患詳細
-        st.markdown("**疾患詳細 ***")
-        disease_text = create_rich_text_editor(
-            content="",
-            placeholder="疾患の概要、原因、症状などを入力してください。太字、色付け、リストなども使用できます。",
-            key="disease_text_editor",
-            height=300
-        )
-        
-        keyword = st.text_input("症状・キーワード", placeholder="例：胸痛、背部痛、急性")
-        disease_image = st.file_uploader("疾患関連画像をアップロード", type=['png', 'jpg', 'jpeg'], key="create_disease_img_upload",
-                                        help="対応形式: PNG, JPEG, JPG（最大5MB）")
-        disease_img_b64 = None
-        if disease_image:
-            disease_img_b64, error_msg = validate_and_process_image(disease_image)
-            if disease_img_b64 is None:
-                st.error(f"疾患画像: {error_msg}")
-            else:
-                st.image(disease_image, caption="疾患関連画像プレビュー", width=300)
-        
-        st.markdown("---")
-        
-        # 撮影プロトコル
-        st.markdown("### 📸 撮影プロトコル")
-        protocol = st.text_input("撮影プロトコル", placeholder="例：胸腹部造影CT")
-        
-        st.markdown("**撮影プロトコル詳細**")
-        protocol_text = create_rich_text_editor(
-            content="",
-            placeholder="撮影手順、設定値などを入力してください。",
-            key="protocol_text_editor",
-            height=200
-        )
-        
-        protocol_image = st.file_uploader("撮影プロトコル画像をアップロード", type=['png', 'jpg', 'jpeg'], key="create_protocol_img_upload",
-                                        help="対応形式: PNG, JPEG, JPG（最大5MB）")
-        protocol_img_b64 = None
-        if protocol_image:
-            protocol_img_b64, error_msg = validate_and_process_image(protocol_image)
-            if protocol_img_b64 is None:
-                st.error(f"撮影プロトコル画像: {error_msg}")
-            else:
-                st.image(protocol_image, caption="撮影プロトコル画像プレビュー", width=300)
-        
-        st.markdown("---")
-        
-        # 造影プロトコル
-        st.markdown("### 💉 造影プロトコル")
-        contrast = st.text_input("造影プロトコル", placeholder="例：オムニパーク300 100ml")
-        
-        st.markdown("**造影プロトコル詳細**")
-        contrast_text = create_rich_text_editor(
-            content="",
-            placeholder="造影剤の種類、量、投与方法などを入力してください。",
-            key="contrast_text_editor",
-            height=200
-        )
-        
-        contrast_image = st.file_uploader("造影プロトコル画像をアップロード", type=['png', 'jpg', 'jpeg'], key="create_contrast_img_upload",
-                                        help="対応形式: PNG, JPEG, JPG（最大5MB）")
-        contrast_img_b64 = None
-        if contrast_image:
-            contrast_img_b64, error_msg = validate_and_process_image(contrast_image)
-            if contrast_img_b64 is None:
-                st.error(f"造影プロトコル画像: {error_msg}")
-            else:
-                st.image(contrast_image, caption="造影プロトコル画像プレビュー", width=300)
-        
-        st.markdown("---")
-        
-        # 画像処理
-        st.markdown("### 🖥️ 画像処理")
-        processing = st.text_input("画像処理", placeholder="例：MPR、VR、CPR")
-        
-        st.markdown("**画像処理詳細**")
-        processing_text = create_rich_text_editor(
-            content="",
-            placeholder="画像処理の手順、設定などを入力してください。",
-            key="processing_text_editor",
-            height=200
-        )
-        
-        processing_image = st.file_uploader("画像処理画像をアップロード", type=['png', 'jpg', 'jpeg'], key="create_processing_img_upload",
-                                          help="対応形式: PNG, JPEG, JPG（最大5MB）")
-        processing_img_b64 = None
-        if processing_image:
-            processing_img_b64, error_msg = validate_and_process_image(processing_image)
-            if processing_img_b64 is None:
-                st.error(f"画像処理画像: {error_msg}")
-            else:
-                st.image(processing_image, caption="画像処理画像プレビュー", width=300)
-        
-        # フォーム送信
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            submitted = st.form_submit_button("📝 疾患データを作成", use_container_width=True)
-        with col2:
-            if st.form_submit_button("🔙 戻る", use_container_width=True):
-                st.session_state.page = "search"
-                st.rerun()
-    
-    # フォーム処理
-    if submitted:
-        if not disease_name or not disease_text:
-            st.error("疾患名と疾患詳細は必須項目です")
-        else:
-            try:
-                add_sick(
-                    disease_name, disease_text, keyword or "",
-                    protocol or "", protocol_text or "",
-                    processing or "", processing_text or "",
-                    contrast or "", contrast_text or "",
-                    disease_img_b64, protocol_img_b64,
-                    processing_img_b64, contrast_img_b64
-                )
-                
-                # 作成成功フラグを設定
-                st.session_state.disease_created = True
-                st.session_state.created_disease_name = disease_name
-                st.rerun()
-                
-            except Exception as e:
-                st.error(f"データ作成中にエラーが発生しました: {str(e)}")
-    
-    # 作成完了メッセージと確認画面
-    if st.session_state.get('disease_created', False):
-        st.success("✅ 疾患データが正常に作成されました！")
-        st.balloons()
-        
-        # 作成された疾患の情報を表示
-        st.markdown(f"""
-        <div class="disease-card">
-            <h3>📋 作成完了</h3>
-            <p><strong>疾患名:</strong> {st.session_state.get('created_disease_name', '')}</p>
-            <p><strong>作成日時:</strong> {datetime.now().strftime('%Y年%m月%d日 %H:%M')}</p>
-            <p>データベースに正常に保存されました。</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # 確認後のアクションボタン
-        col1, col2, col3 = st.columns([1, 1, 1])
-        
-        with col1:
-            if st.button("🔍 検索ページに戻る", key="create_success_back_to_search", use_container_width=True):
-                # 成功フラグをクリア
-                if 'disease_created' in st.session_state:
-                    del st.session_state.disease_created
-                if 'created_disease_name' in st.session_state:
-                    del st.session_state.created_disease_name
-                st.session_state.page = "search"
-                st.rerun()
-        
-        with col2:
-            if st.button("📝 続けて作成", key="create_success_continue", use_container_width=True):
-                # 成功フラグをクリアして新規作成を続行
-                if 'disease_created' in st.session_state:
-                    del st.session_state.disease_created
-                if 'created_disease_name' in st.session_state:
-                    del st.session_state.created_disease_name
-                st.rerun()
-        
-        with col3:
-            if st.button("👁️ 作成した疾患を確認", key="create_success_view_created", use_container_width=True):
-                # 作成した疾患の詳細ページに移動
-                # 最新の疾患データを取得
-                conn = get_db_connection()
-                cursor = conn.cursor()
-                cursor.execute("SELECT id FROM sicks WHERE diesease = %s ORDER BY created_at DESC LIMIT 1", 
-                              (st.session_state.get('created_disease_name', ''),))
-                result = cursor.fetchone()
-                conn.close()
-                
-                if result:
-                    st.session_state.selected_sick_id = result[0]
-                    st.session_state.page = "detail"
-                    # 成功フラグをクリア
-                    if 'disease_created' in st.session_state:
-                        del st.session_state.disease_created
-                    if 'created_disease_name' in st.session_state:
-                        del st.session_state.created_disease_name
-                    st.rerun()
-        
-        # この場合は戻るボタンを表示しない
-        return
-    
-    # 戻るボタン（通常時のみ表示）
-    if st.button("戻る", key="create_disease_back_from_create"):
-        st.session_state.page = "search"
-        st.rerun()
-
-# サイドバー関数
-def show_sidebar():
-    """サイドバー表示"""
-    with st.sidebar:
-        st.markdown("### 🏥 How to CT")
-        
-        if RICH_EDITOR_AVAILABLE:
-            st.success("📝 リッチテキストエディタ対応")
-        else:
-            st.warning("📝 リッチエディタ未対応")
-        
-        if 'user' in st.session_state:
-            st.markdown(f"**ログイン中:** {st.session_state.user['name']}")
-            
-            st.markdown("---")
-            st.markdown("### 📋 メニュー")
-            
-            if st.button("🏠 ホーム", use_container_width=True, key="sidebar_home"):
-                st.session_state.page = "home"
-                st.rerun()
-            
-            if st.button("🔍 疾患検索", use_container_width=True, key="sidebar_search"):
-                st.session_state.page = "search"
-                st.rerun()
-            
-            if st.button("📢 お知らせ", use_container_width=True, key="sidebar_notices"):
-                st.session_state.page = "notices"
-                st.rerun()
-
-            if st.button("📋 CTプロトコル", use_container_width=True, key="sidebar_protocols"):
-                st.session_state.page = "protocols"
-                st.rerun()
-            
-            st.markdown("---")
-            
-            if st.button("📝 新規疾患作成", use_container_width=True, key="sidebar_create_disease"):
-                st.session_state.page = "create_disease"
-                st.rerun()
-            
-            if st.button("📝 新規お知らせ作成", use_container_width=True, key="sidebar_create_notice"):
-                st.session_state.page = "create_notice"
-                st.rerun()
-            
-            st.markdown("---")
-            
-            if st.button("🚪 ログアウト", use_container_width=True):
-                # ログアウト時にセッション情報をクリア
-                if 'user' in st.session_state:
-                    user_id = st.session_state.user['id']
-                    try:
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        cursor.execute('DELETE FROM user_sessions WHERE user_id = %s', (user_id,))
-                        conn.commit()
-                        cursor.close()
-                        conn.close()
-                    except:
-                        pass
-                for key in list(st.session_state.keys()):
-                    if key != 'db_initialized':  # DB初期化状態は保持
-                        del st.session_state[key]
-                st.session_state.page = "welcome"
-                st.rerun()
-
-            # 管理者メニュー（管理者のみ表示）
-            if is_admin_user():
-                st.markdown("---")
-                st.markdown("### 👨‍💼 管理者メニュー")
-                if st.button("ユーザー管理", use_container_width=True, key="sidebar_admin"):
-                    st.session_state.page = "admin"
-                    st.rerun()
-        
-        st.markdown("---")
-        st.markdown("### ℹ️ システム情報")
-        st.markdown("**診療放射線技師向け**")
-        st.markdown("CT検査マニュアルシステム")
-        st.markdown("疾患別プロトコル管理")
-        st.markdown("画像アップロード対応")
-        
-        if RICH_EDITOR_AVAILABLE:
-            st.markdown("リッチテキストエディタ対応")
-        else:
-            st.markdown("リッチエディタ未導入")
-            st.markdown("`pip install streamlit-quill`")
-            st.markdown("でインストールしてください")
-
-# メインアプリ表示関数
-def show_main_app():
-    """ログイン後のメインアプリ表示"""
-    if st.session_state.page == "home":
-        show_home_page()
-    elif st.session_state.page == "search":
-        show_search_page()
-    elif st.session_state.page == "detail":
-        show_detail_page()
-    elif st.session_state.page == "notices":
-        show_notices_page()
-    elif st.session_state.page == "notice_detail":
-        show_notice_detail_page()
-    elif st.session_state.page == "create_disease":
-        show_create_disease_page()
-    elif st.session_state.page == "create_notice":
-        show_create_notice_page()
-    elif st.session_state.page == "edit_notice":
-        show_edit_notice_page()
-    elif st.session_state.page == "admin":
-        show_admin_page()
-    else:
-        # デフォルトはホーム画面
-        st.session_state.page = "home"
-        show_home_page()
-
-# 管理者ページ（簡略版）
-def show_admin_page():
-    """管理者専用ページ"""
-    if not is_admin_user():
-        st.error("🚫 管理者権限が必要です")
-        return
-    
-    st.markdown('<div class="main-header"><h1>管理者専用ページ</h1></div>', unsafe_allow_html=True)
-    st.markdown(f"**管理者:** {st.session_state.user['name']} ({st.session_state.user['email']})")
-    
-    # タブで機能を分ける
-    tab1, tab2, tab3 = st.tabs(["新規ユーザー作成", "ユーザー管理", "データバックアップ"])
-    
-    with tab1:
-        st.markdown("### 新規ユーザー作成")
-        
-        with st.form("admin_register_form"):
-            st.info("管理者のみが新しいユーザーアカウントを作成できます")
-            
-            name = st.text_input("氏名 *", placeholder="例：山田太郎")
-            email = st.text_input("メールアドレス *", placeholder="例：yamada@hospital.com")
-            password = st.text_input("初期パスワード *", type="password", placeholder="8文字以上推奨")
-            password_confirm = st.text_input("パスワード確認 *", type="password")
-            
-            # ユーザー種別選択（参考情報）
-            user_type = st.selectbox("ユーザー種別（参考）", [
-                "診療放射線技師", 
-                "医師", 
-                "看護師", 
-                "管理者", 
-                "その他"
-            ])
-            
-            notes = st.text_area("備考", placeholder="部署、役職、特記事項など")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                submitted = st.form_submit_button("ユーザー作成", use_container_width=True)
-            with col2:
-                if st.form_submit_button("フォームをクリア", use_container_width=True):
-                    st.rerun()
-            
-            if submitted:
-                if name and email and password and password_confirm:
-                    # メールアドレス検証を追加
-                    email_valid, email_error = validate_email(email)
-                    if not email_valid:
-                        st.error(f"❌ {email_error}")
-                        st.info("💡 正しい形式の例: yamada@hospital.com")
-                    elif password == password_confirm:
-                        if len(password) >= 6:  # パスワード長チェック
-                            if admin_register_user(name, email, password):
-                                st.success(f"✅ ユーザー「{name}」を作成しました")
-                                st.info(f"📧 ログイン情報\nメール: {email}\nパスワード: {password}")
-                                
-                                # 作成完了の詳細情報
-                                st.markdown(f"""
-                                <div class="notice-card">
-                                    <h4>作成されたユーザー情報</h4>
-                                    <ul>
-                                        <li><strong>氏名:</strong> {name}</li>
-                                        <li><strong>メールアドレス:</strong> {email}</li>
-                                        <li><strong>ユーザー種別:</strong> {user_type}</li>
-                                        <li><strong>作成日時:</strong> {datetime.now().strftime('%Y年%m月%d日 %H:%M')}</li>
-                                        {f'<li><strong>備考:</strong> {notes}</li>' if notes else ''}
-                                    </ul>
-                                    <p style="color: #ff9800;">⚠️ 初期パスワードをユーザーに安全に伝達してください</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                            else:
-                                st.error("❌ このメールアドレスは既に登録されています")
-                        else:
-                            st.error("❌ パスワードは6文字以上で設定してください")
-                    else:
-                        st.error("❌ パスワードが一致しません")
-                else:
-                    st.error("❌ 全ての必須項目を入力してください")
-    
-    with tab2:
-        st.markdown("### ユーザー管理")
-        
-        # 全ユーザー一覧表示
-        df_users = get_all_users()
-        
-        if not df_users.empty:
-            st.markdown(f"**登録ユーザー数:** {len(df_users)}人")
-            
-            # ユーザー一覧をカード形式で表示
-            for idx, user in df_users.iterrows():
-                st.markdown('<div class="search-result">', unsafe_allow_html=True)
-                
-                col1, col2, col3 = st.columns([3, 1, 1])
-                
-                with col1:
-                    st.markdown(f"**👤 {user['name']}**")
-                    st.markdown(f"📧 {user['email']}")
-                    st.caption(f"登録日: {user['created_at']}")
-                
-                with col2:
-                    # 現在のユーザー自身は削除できないようにする
-                    if user['email'] != st.session_state.user['email']:
-                        if st.button("編集", key=f"edit_user_{user['id']}", disabled=True):
-                            st.info("編集機能は今後追加予定です")
-                    else:
-                        st.markdown("**(現在のユーザー)**")
-                
-                with col3:
-                    # 管理者ユーザーと現在のユーザー自身は削除不可
-                    admin_emails = ['admin@hospital.jp']
-                    if user['email'] not in admin_emails and user['email'] != st.session_state.user['email']:
-                        if st.button("削除", key=f"delete_user_{user['id']}"):
-                            # 削除確認
-                            if st.session_state.get(f'confirm_delete_user_{user["id"]}', False):
-                                delete_user(user['id'])
-                                st.success(f"ユーザー「{user['name']}」を削除しました")
-                                st.rerun()
-                            else:
-                                st.session_state[f'confirm_delete_user_{user["id"]}'] = True
-                                st.warning("もう一度削除ボタンを押すと削除されます")
-                    elif user['email'] in admin_emails:
-                        st.markdown("**(管理者)**")
-                    else:
-                        st.markdown("**(現在のユーザー)**")
-                
-                st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            st.info("登録ユーザーがいません")
-    
-    with tab3:
-        st.markdown("### データバックアップ・復元")
-        
-        # バックアップセクション
-        st.markdown("#### データのバックアップ")
-        
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.info("""
-            **バックアップに含まれるデータ:**
-            - 疾患データ（画像含む）
-            - お知らせ（画像含む）
-            - CTプロトコル（画像含む）
-            - ユーザー情報（パスワード除く）
-            """)
-        
-        with col2:
-            if st.button("バックアップ作成", use_container_width=True, key="create_backup"):
-                with st.spinner("バックアップを作成中..."):
-                    backup_data, error = create_backup_zip()
-                    
-                    if backup_data:
-                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                        filename = f"ct_system_backup_{timestamp}.zip"
-                        
-                        st.download_button(
-                            label="バックアップをダウンロード",
-                            data=backup_data,
-                            file_name=filename,
-                            mime="application/zip",
-                            use_container_width=True
-                        )
-                        st.success("✅ バックアップが作成されました！")
-                    else:
-                        st.error(f"❌ {error}")
-        
-        st.markdown("---")
-        
-        # 復元セクション
-        st.markdown("#### データの復元")
-        
-        uploaded_file = st.file_uploader(
-            "バックアップファイルを選択",
-            type=['json', 'zip'],
-            help="backup_data.json または バックアップZIPファイルをアップロード"
-        )
-        
-        if uploaded_file is not None:
-            file_type = uploaded_file.name.split('.')[-1].lower()
-            
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                st.warning("""
-                ⚠️ **復元時の注意事項:**
-                - 既存のデータと重複する場合は上書きされます
-                - 復元前に現在のデータをバックアップすることを推奨します
-                - ユーザーデータは復元されません（手動で再作成が必要）
-                """)
-            
-            with col2:
-                if st.button("データを復元", use_container_width=True, key="restore_data"):
-                    try:
-                        if file_type == 'json':
-                            # JSONファイルから直接復元
-                            json_content = uploaded_file.read().decode('utf-8')
-                            json_data = json.loads(json_content)
-                            
-                        elif file_type == 'zip':
-                            # ZIPファイルから復元
-                            with zipfile.ZipFile(uploaded_file, 'r') as zip_file:
-                                json_content = zip_file.read('backup_data.json').decode('utf-8')
-                                json_data = json.loads(json_content)
-                        
-                        # 復元実行
-                        with st.spinner("データを復元中..."):
-                            success, result = restore_from_json(json_data)
-                            
-                            if success:
-                                st.success("🎉 データの復元が完了しました！")
-                                st.info(f"""
-                                **📊 復元結果:**
-                                - 疾患データ: {result['sicks']}件
-                                - お知らせ: {result['forms']}件
-                                - CTプロトコル: {result['protocols']}件
-                                """)
-                                st.balloons()
-                            else:
-                                st.error(f"❌ {result}")
-                    
-                    except Exception as e:
-                        st.error(f"❌ ファイルの処理中にエラーが発生しました: {str(e)}")
-
-# メイン処理
-def main():
-    """メイン処理"""
-    # 初回のみデータベース初期化（パフォーマンス改善）
-    if 'db_initialized' not in st.session_state:
-        init_connection()
-        try:
-            init_database()
-            insert_sample_data()
-            st.session_state.db_initialized = True
-        except Exception as e:
-            st.error(f"データベース初期化エラー: {e}")
-            st.warning("一部機能が制限される場合があります")
-    
-    # セッション状態の復元（ブラウザ更新対応）
-    if 'user' not in st.session_state:
-        # データベースからセッション情報を復元を試行
-        try:
-            session_data = load_session_from_db()
-            if session_data:
-                st.session_state.user = session_data['user']
-                st.session_state.page = session_data['page']
-        except:
-            pass  # セッション復元失敗は無視
-    
-    # ページ状態の初期化
-    if 'page' not in st.session_state:
-        st.session_state.page = "welcome"
-    
-    # ログイン状態による分岐
-    if 'user' not in st.session_state:
-        # ログインしていない場合
-        if st.session_state.page == "welcome":
-            show_welcome_page()
-        elif st.session_state.page == "login":
-            show_login_page()
-        else:
-            # その他のページはウェルカム画面に戻す
-            st.session_state.page = "welcome"
-            show_welcome_page()
-    else:
-        # ログイン済みの場合
-        # ウェルカムページにいる場合はホームに移動
-        if st.session_state.page == "welcome":
-            st.session_state.page = "home"
-        
-        show_sidebar()  # サイドバー表示
-        show_main_app()  # メインコンテンツ表示
-
-if __name__ == "__main__":
-    main()
-    import streamlit as st
+import streamlit as st
 import sqlite3
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -1615,301 +746,6 @@ def delete_protocol(protocol_id):
     conn.commit()
     conn.close()
 
-def export_all_data():
-    """全データをJSONでエクスポート"""
-    conn = get_db_connection()
-    
-    # 全テーブルのデータを取得
-    data = {
-        'export_info': {
-            'export_date': datetime.now().isoformat(),
-            'version': '1.0',
-            'app_name': 'How to CT Medical System'
-        },
-        'users': [],
-        'sicks': [],
-        'forms': [],
-        'protocols': []
-    }
-    
-    try:
-        # ユーザーデータ（パスワードは除外）
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, email, created_at, updated_at FROM users")
-        users = cursor.fetchall()
-        for user in users:
-            data['users'].append({
-                'id': user[0],
-                'name': user[1],
-                'email': user[2],
-                'created_at': user[3] if user[3] else '',
-                'updated_at': user[4] if user[4] else ''
-            })
-        
-        # 疾患データ
-        cursor.execute("SELECT * FROM sicks")
-        sicks = cursor.fetchall()
-        for sick in sicks:
-            data['sicks'].append({
-                'id': sick[0],
-                'diesease': sick[1],
-                'diesease_text': sick[2],
-                'keyword': sick[3],
-                'protocol': sick[4],
-                'protocol_text': sick[5],
-                'processing': sick[6],
-                'processing_text': sick[7],
-                'contrast': sick[8],
-                'contrast_text': sick[9],
-                'diesease_img': sick[10],
-                'protocol_img': sick[11],
-                'processing_img': sick[12],
-                'contrast_img': sick[13],
-                'created_at': sick[14] if sick[14] else '',
-                'updated_at': sick[15] if sick[15] else ''
-            })
-        
-        # お知らせデータ
-        cursor.execute("SELECT * FROM forms")
-        forms = cursor.fetchall()
-        for form in forms:
-            data['forms'].append({
-                'id': form[0],
-                'title': form[1],
-                'main': form[2],
-                'post_img': form[3],
-                'created_at': form[4] if form[4] else '',
-                'updated_at': form[5] if form[5] else ''
-            })
-        
-        # CTプロトコルデータ
-        cursor.execute("SELECT * FROM protocols")
-        protocols = cursor.fetchall()
-        for protocol in protocols:
-            data['protocols'].append({
-                'id': protocol[0],
-                'category': protocol[1],
-                'title': protocol[2],
-                'content': protocol[3],
-                'protocol_img': protocol[4],
-                'created_at': protocol[5] if protocol[5] else '',
-                'updated_at': protocol[6] if protocol[6] else ''
-            })
-        
-    except Exception as e:
-        conn.close()
-        return None, f"データエクスポート中にエラーが発生しました: {str(e)}"
-    
-    conn.close()
-    return data, "OK"
-
-def create_backup_zip():
-    """バックアップZIPファイルを作成"""
-    try:
-        # データをエクスポート
-        data, error = export_all_data()
-        if data is None:
-            return None, error
-        
-        # メモリ上でZIPファイルを作成
-        zip_buffer = BytesIO()
-        
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            # JSONデータを追加
-            json_data = json.dumps(data, ensure_ascii=False, indent=2)
-            zip_file.writestr('backup_data.json', json_data.encode('utf-8'))
-            
-            # SQLiteファイルも追加
-            try:
-                zip_file.write('medical_ct.db', 'medical_ct.db')
-            except FileNotFoundError:
-                # SQLiteファイルが見つからない場合はスキップ
-                pass
-            
-            # README追加
-            readme_content = f"""
-How to CT Medical System - データバックアップ
-
-エクスポート日時: {datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')}
-
-含まれるファイル:
-- backup_data.json: 全データのJSON形式
-- medical_ct.db: SQLiteデータベースファイル（存在する場合）
-
-復元方法:
-1. backup_data.jsonを使用してデータを復元
-2. または medical_ct.db を直接利用
-
-注意事項:
-- ユーザーのパスワードは含まれていません
-- 復元時は管理者権限が必要です
-"""
-            zip_file.writestr('README.txt', readme_content.encode('utf-8'))
-        
-        zip_buffer.seek(0)
-        return zip_buffer.getvalue(), "OK"
-        
-    except Exception as e:
-        return None, f"バックアップファイル作成中にエラーが発生しました: {str(e)}"
-
-def restore_from_json(json_data):
-    """JSONデータから復元（完全置換モード）"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # 復元開始
-        restored_counts = {
-            'sicks': 0,
-            'forms': 0,
-            'protocols': 0,
-            'deleted_sicks': 0,
-            'deleted_forms': 0,
-            'deleted_protocols': 0
-        }
-        
-        # 移行タイプをチェック
-        migration_type = json_data.get('export_info', {}).get('migration_type', 'unknown')
-        
-        if migration_type == 'complete_replacement':
-            print("🔄 完全置換モードで復元開始...")
-            
-            # 既存データの件数を記録
-            cursor.execute('SELECT COUNT(*) FROM sicks')
-            restored_counts['deleted_sicks'] = cursor.fetchone()[0]
-            
-            cursor.execute('SELECT COUNT(*) FROM forms')
-            restored_counts['deleted_forms'] = cursor.fetchone()[0]
-            
-            cursor.execute('SELECT COUNT(*) FROM protocols')
-            restored_counts['deleted_protocols'] = cursor.fetchone()[0]
-            
-            print(f"📊 削除予定データ - 疾患:{restored_counts['deleted_sicks']}件, お知らせ:{restored_counts['deleted_forms']}件, プロトコル:{restored_counts['deleted_protocols']}件")
-            
-            # 既存データを完全削除（ユーザーデータとセッションは保持）
-            print("🗑️ 既存データを削除中...")
-            cursor.execute('DELETE FROM sicks')
-            cursor.execute('DELETE FROM forms') 
-            cursor.execute('DELETE FROM protocols')
-            
-            print("✅ 既存データ削除完了")
-        else:
-            print("➕ 追加モードで復元開始...")
-        
-        # 疾患データの投入
-        if 'sicks' in json_data and json_data['sicks']:
-            print(f"📋 Laravel版疾患データを投入中... ({len(json_data['sicks'])}件)")
-            
-            for i, sick in enumerate(json_data['sicks']):
-                try:
-                    cursor.execute('''
-                        INSERT INTO sicks (
-                            diesease, diesease_text, keyword, protocol, protocol_text,
-                            processing, processing_text, contrast, contrast_text,
-                            diesease_img, protocol_img, processing_img, contrast_img
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ''', (
-                        sick.get('diesease', ''),
-                        sick.get('diesease_text', ''),
-                        sick.get('keyword', ''),
-                        sick.get('protocol', ''),
-                        sick.get('protocol_text', ''),
-                        sick.get('processing', ''),
-                        sick.get('processing_text', ''),
-                        sick.get('contrast', ''),
-                        sick.get('contrast_text', ''),
-                        '',  # 画像データは空文字
-                        '',  # 画像データは空文字
-                        '',  # 画像データは空文字
-                        ''   # 画像データは空文字
-                    ))
-                    restored_counts['sicks'] += 1
-                    
-                    # 進捗表示
-                    if (i + 1) % 10 == 0 or (i + 1) == len(json_data['sicks']):
-                        print(f"   進捗: {i + 1}/{len(json_data['sicks'])}件")
-                        
-                except Exception as e:
-                    print(f"   ⚠️ 疾患データスキップ: {sick.get('diesease', 'Unknown')} - {e}")
-            
-            print(f"✅ 疾患データ投入完了: {restored_counts['sicks']}件")
-        
-        # お知らせデータの投入
-        if 'forms' in json_data and json_data['forms']:
-            print(f"📢 Laravel版お知らせデータを投入中... ({len(json_data['forms'])}件)")
-            
-            for i, form in enumerate(json_data['forms']):
-                try:
-                    cursor.execute('''
-                        INSERT INTO forms (title, main, post_img)
-                        VALUES (%s, %s, %s)
-                    ''', (
-                        form.get('title', ''),
-                        form.get('main', ''),
-                        ''  # 画像データは空文字
-                    ))
-                    restored_counts['forms'] += 1
-                    
-                    # 進捗表示
-                    if (i + 1) % 5 == 0 or (i + 1) == len(json_data['forms']):
-                        print(f"   進捗: {i + 1}/{len(json_data['forms'])}件")
-                        
-                except Exception as e:
-                    print(f"   ⚠️ お知らせデータスキップ: {form.get('title', 'Unknown')} - {e}")
-            
-            print(f"✅ お知らせデータ投入完了: {restored_counts['forms']}件")
-        
-        # CTプロトコルデータの投入
-        if 'protocols' in json_data and json_data['protocols']:
-            print(f"🔧 Laravel版プロトコルデータを投入中... ({len(json_data['protocols'])}件)")
-            
-            for i, protocol in enumerate(json_data['protocols']):
-                try:
-                    cursor.execute('''
-                        INSERT INTO protocols (category, title, content, protocol_img)
-                        VALUES (%s, %s, %s, %s)
-                    ''', (
-                        protocol.get('category', ''),
-                        protocol.get('title', ''),
-                        protocol.get('content', ''),
-                        ''  # 画像データは空文字
-                    ))
-                    restored_counts['protocols'] += 1
-                    
-                    # 進捗表示
-                    if (i + 1) % 5 == 0 or (i + 1) == len(json_data['protocols']):
-                        print(f"   進捗: {i + 1}/{len(json_data['protocols'])}件")
-                        
-                except Exception as e:
-                    print(f"   ⚠️ プロトコルデータスキップ: {protocol.get('title', 'Unknown')} - {e}")
-            
-            print(f"✅ プロトコルデータ投入完了: {restored_counts['protocols']}件")
-        
-        # コミットして終了
-        conn.commit()
-        conn.close()
-        
-        print("\n🎉 データ移行完了！")
-        print(f"📊 復元サマリー:")
-        print(f"   - 疾患データ: {restored_counts['sicks']}件")
-        print(f"   - お知らせ: {restored_counts['forms']}件")
-        print(f"   - プロトコル: {restored_counts['protocols']}件")
-        
-        if migration_type == 'complete_replacement':
-            print(f"📋 削除されたデータ:")
-            print(f"   - 疾患データ: {restored_counts['deleted_sicks']}件")
-            print(f"   - お知らせ: {restored_counts['deleted_forms']}件") 
-            print(f"   - プロトコル: {restored_counts['deleted_protocols']}件")
-        
-        return True, restored_counts
-        
-    except Exception as e:
-        if 'conn' in locals():
-            conn.rollback()
-            conn.close()
-        print(f"❌ 復元エラー: {e}")
-        return False, f"復元中にエラーが発生しました: {str(e)}"
-
 def is_admin_user():
     """現在のユーザーが管理者かどうかチェック"""
     if 'user' not in st.session_state:
@@ -1929,7 +765,6 @@ def validate_email(email):
     
     # より詳細な正規表現チェック
     email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}
-        '
     if not re.match(email_pattern, email):
         return False, "メールアドレスの形式が正しくありません"
     
@@ -2058,8 +893,6 @@ def show_home_page():
     else:
         st.info("お知らせがありません")
 
-# 他のページ関数は同様に継続...
-
 def show_search_page():
     """疾患検索ページ（修正版）"""
     st.markdown('<div class="main-header"><h1>疾患検索</h1></div>', unsafe_allow_html=True)
@@ -2167,8 +1000,6 @@ def show_search_page():
                 del st.session_state.show_all_diseases
             st.rerun()
 
-# その他の全てのページ関数を含む完全版を継続...
-
 def show_detail_page():
     """疾患詳細ページ（修正版）"""
     if 'selected_sick_id' not in st.session_state:
@@ -2236,7 +1067,7 @@ def show_detail_page():
         st.markdown('<div class="contrast-section">', unsafe_allow_html=True)
         if sick_data[8]:  # contrast
             st.markdown(f"### 造影プロトコル: {sick_data[8]}")
-        f sick_data[9]:  # contrast_text
+        if sick_data[9]:  # contrast_text
             st.markdown("**造影手順:**")
             display_rich_content(sick_data[9])
         else:
@@ -2292,7 +1123,719 @@ def show_detail_page():
             del st.session_state.selected_sick_id
         st.rerun()
 
-# メイン処理の最後の部分
+def show_notices_page():
+    """お知らせ一覧ページ"""
+    st.markdown('<div class="main-header"><h1>お知らせ一覧</h1></div>', unsafe_allow_html=True)
+    
+    # 新規作成ボタン
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        if st.button("新規お知らせ作成", key="notices_create_notice"):
+            st.session_state.page = "create_notice"
+            st.rerun()
+    
+    df = get_all_forms()
+    if not df.empty:
+        for idx, row in df.iterrows():
+            st.markdown('<div class="notice-card">', unsafe_allow_html=True)
+            col1, col2 = st.columns([4, 1])
+            
+            with col1:
+                st.markdown(f"### {row['title']}")
+                # リッチテキストのプレビュー表示
+                preview_text = row['main'][:200] + "..." if len(str(row['main'])) > 200 else row['main']
+                display_rich_content(preview_text)
+                st.caption(f"作成日: {row['created_at']}")
+            
+            with col2:
+                if st.button("詳細", key=f"notices_detail_{row['id']}"):
+                    st.session_state.selected_notice_id = row['id']
+                    st.session_state.page = "notice_detail"
+                    st.rerun()
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.info("お知らせがありません")
+
+def show_notice_detail_page():
+    """お知らせ詳細ページ"""
+    if 'selected_notice_id' not in st.session_state:
+        st.error("お知らせが選択されていません")
+        if st.button("お知らせ一覧に戻る", key="notice_detail_back_no_selection"):
+            st.session_state.page = "notices"
+            st.rerun()
+        return
+    
+    form_data = get_form_by_id(st.session_state.selected_notice_id)
+    if not form_data:
+        st.error("お知らせが見つかりません")
+        if st.button("お知らせ一覧に戻る", key="notice_detail_back_not_found"):
+            st.session_state.page = "notices"
+            if 'selected_notice_id' in st.session_state:
+                del st.session_state.selected_notice_id
+            st.rerun()
+        return
+    
+    st.title(f"{form_data[1]}")
+    
+    st.markdown('<div class="notice-card">', unsafe_allow_html=True)
+    display_rich_content(form_data[2])  # main content をリッチテキストとして表示
+    
+    # お知らせ画像表示
+    if form_data[3]:  # post_img
+        st.markdown("**添付画像:**")
+        display_image_with_caption(form_data[3], "お知らせ画像")
+    
+    st.caption(f"作成日: {form_data[4]}")
+    st.caption(f"更新日: {form_data[5]}")
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 編集・削除・戻るボタン（本文下、縦並び）
+    if st.button("編集", key="notice_detail_edit_notice"):
+        st.session_state.edit_notice_id = form_data[0]
+        st.session_state.page = "edit_notice"
+        st.rerun()
+    
+    if st.button("削除", key="notice_detail_delete_notice"):
+        if st.session_state.get('confirm_delete_notice', False):
+            delete_form(form_data[0])
+            st.success("お知らせを削除しました")
+            st.session_state.page = "notices"
+            if 'confirm_delete_notice' in st.session_state:
+                del st.session_state.confirm_delete_notice
+            if 'selected_notice_id' in st.session_state:
+                del st.session_state.selected_notice_id
+            st.rerun()
+        else:
+            st.session_state.confirm_delete_notice = True
+            st.warning("削除ボタンをもう一度押すと削除されます")
+    
+    if st.button("戻る", key="notice_detail_back_to_notices"):
+        st.session_state.page = "notices"
+        if 'selected_notice_id' in st.session_state:
+            del st.session_state.selected_notice_id
+        st.rerun()
+
+def show_create_notice_page():
+    """お知らせ作成ページ"""
+    st.markdown('<div class="main-header"><h1>新規お知らせ作成</h1></div>', unsafe_allow_html=True)
+    
+    with st.form("create_notice_form"):
+        title = st.text_input("タイトル *", placeholder="例：新型CT装置導入のお知らせ")
+        
+        # リッチテキストエディタを使用
+        st.markdown("**本文 ***")
+        main = create_rich_text_editor(
+            content="",
+            placeholder="お知らせの内容を入力してください。見出し、太字、色付け、リストなどを使って見やすく作成できます。",
+            key="notice_main_editor",
+            height=400
+        )
+        
+        # お知らせ画像アップロード
+        st.markdown("**添付画像**")
+        notice_image = st.file_uploader("お知らせ画像をアップロード", type=['png', 'jpg', 'jpeg'], key="create_notice_img_upload",
+                                      help="推奨サイズ: 5MB以下、形式: PNG, JPEG, JPG")
+        if notice_image is not None:
+            st.image(notice_image, caption="アップロード予定のお知らせ画像", width=300)
+        
+        submitted = st.form_submit_button("登録", use_container_width=True)
+        
+        if submitted:
+            if title and main:
+                try:
+                    # 画像をBase64に変換
+                    notice_img_b64 = None
+                    if notice_image is not None:
+                        notice_img_b64, error_msg = validate_and_process_image(notice_image)
+                        if notice_img_b64 is None:
+                            st.error(f"お知らせ画像: {error_msg}")
+                            return
+                    
+                    add_form(title, main, notice_img_b64)
+                    st.success("お知らせを登録しました")
+                    st.session_state.page = "notices"
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"データの保存中にエラーが発生しました: {str(e)}")
+            else:
+                st.error("タイトルと本文は必須項目です")
+    
+    if st.button("戻る", key="create_notice_back_from_create"):
+        st.session_state.page = "notices"
+        st.rerun()
+
+def show_edit_notice_page():
+    """お知らせ編集ページ"""
+    if 'edit_notice_id' not in st.session_state:
+        st.error("編集対象が選択されていません")
+        if st.button("お知らせ一覧に戻る", key="edit_notice_back_no_selection"):
+            st.session_state.page = "notices"
+            st.rerun()
+        return
+    
+    form_data = get_form_by_id(st.session_state.edit_notice_id)
+    if not form_data:
+        st.error("お知らせが見つかりません")
+        if st.button("お知らせ一覧に戻る", key="edit_notice_back_not_found"):
+            st.session_state.page = "notices"
+            if 'edit_notice_id' in st.session_state:
+                del st.session_state.edit_notice_id
+            st.rerun()
+        return
+    
+    st.markdown('<div class="main-header"><h1>お知らせ編集</h1></div>', unsafe_allow_html=True)
+    
+    with st.form("edit_notice_form"):
+        title = st.text_input("タイトル *", value=form_data[1])
+        
+        # リッチテキストエディタを使用（既存データを初期値として設定）
+        st.markdown("**本文 ***")
+        main = create_rich_text_editor(
+            content=form_data[2] or "",
+            placeholder="お知らせの内容を入力してください。見出し、太字、色付け、リストなどを使って見やすく作成できます。",
+            key="edit_notice_main_editor",
+            height=400
+        )
+        
+        # お知らせ画像編集
+        st.markdown("**添付画像**")
+        if form_data[3]:  # 既存画像がある場合
+            st.markdown("現在の画像:")
+            display_image_with_caption(form_data[3], "現在のお知らせ画像", width=200)
+            replace_notice_img = st.checkbox("お知らせ画像を変更する")
+            if replace_notice_img:
+                notice_image = st.file_uploader("新しいお知らせ画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_notice_img_upload")
+                if notice_image is not None:
+                    st.image(notice_image, caption="新しいお知らせ画像", width=300)
+            else:
+                notice_image = None
+        else:
+            notice_image = st.file_uploader("お知らせ画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_notice_img_upload")
+            if notice_image is not None:
+                st.image(notice_image, caption="お知らせ画像", width=300)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            submitted = st.form_submit_button("更新", use_container_width=True)
+        with col2:
+            cancel = st.form_submit_button("キャンセル", use_container_width=True)
+        
+        if submitted:
+            if title and main:
+                try:
+                    # 画像処理（既存画像を保持するか新しい画像に更新するか）
+                    notice_img_b64 = form_data[3]  # 既存画像
+                    
+                    # 新しい画像がアップロードされた場合のみ更新
+                    if notice_image is not None:
+                        notice_img_b64, error_msg = validate_and_process_image(notice_image)
+                        if notice_img_b64 is None:
+                            st.error(f"お知らせ画像: {error_msg}")
+                            return
+                    
+                    update_form(st.session_state.edit_notice_id, title, main, notice_img_b64)
+                    st.success("お知らせを更新しました")
+                    st.session_state.selected_notice_id = st.session_state.edit_notice_id
+                    st.session_state.page = "notice_detail"
+                    del st.session_state.edit_notice_id
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"データの保存中にエラーが発生しました: {str(e)}")
+            else:
+                st.error("タイトルと本文は必須項目です")
+        
+        if cancel:
+            st.session_state.selected_notice_id = st.session_state.edit_notice_id
+            st.session_state.page = "notice_detail"
+            del st.session_state.edit_notice_id
+            st.rerun()
+
+def show_create_disease_page():
+    """疾患データ作成ページ"""
+    st.markdown('<div class="main-header"><h1>新規疾患データ作成</h1></div>', unsafe_allow_html=True)
+    
+    with st.form("create_disease_form"):
+        # 疾患情報
+        st.markdown("### 📋 疾患情報")
+        disease_name = st.text_input("疾患名 *", placeholder="例：大動脈解離")
+        
+        # リッチテキストエディタで疾患詳細
+        st.markdown("**疾患詳細 ***")
+        disease_text = create_rich_text_editor(
+            content="",
+            placeholder="疾患の概要、原因、症状などを入力してください。太字、色付け、リストなども使用できます。",
+            key="disease_text_editor",
+            height=300
+        )
+        
+        keyword = st.text_input("症状・キーワード", placeholder="例：胸痛、背部痛、急性")
+        disease_image = st.file_uploader("疾患関連画像をアップロード", type=['png', 'jpg', 'jpeg'], key="create_disease_img_upload",
+                                        help="対応形式: PNG, JPEG, JPG（最大5MB）")
+        disease_img_b64 = None
+        if disease_image:
+            disease_img_b64, error_msg = validate_and_process_image(disease_image)
+            if disease_img_b64 is None:
+                st.error(f"疾患画像: {error_msg}")
+            else:
+                st.image(disease_image, caption="疾患関連画像プレビュー", width=300)
+        
+        st.markdown("---")
+        
+        # 撮影プロトコル
+        st.markdown("### 📸 撮影プロトコル")
+        protocol = st.text_input("撮影プロトコル", placeholder="例：胸腹部造影CT")
+        
+        st.markdown("**撮影プロトコル詳細**")
+        protocol_text = create_rich_text_editor(
+            content="",
+            placeholder="撮影手順、設定値などを入力してください。",
+            key="protocol_text_editor",
+            height=200
+        )
+        
+        protocol_image = st.file_uploader("撮影プロトコル画像をアップロード", type=['png', 'jpg', 'jpeg'], key="create_protocol_img_upload",
+                                        help="対応形式: PNG, JPEG, JPG（最大5MB）")
+        protocol_img_b64 = None
+        if protocol_image:
+            protocol_img_b64, error_msg = validate_and_process_image(protocol_image)
+            if protocol_img_b64 is None:
+                st.error(f"撮影プロトコル画像: {error_msg}")
+            else:
+                st.image(protocol_image, caption="撮影プロトコル画像プレビュー", width=300)
+        
+        st.markdown("---")
+        
+        # 造影プロトコル
+        st.markdown("### 💉 造影プロトコル")
+        contrast = st.text_input("造影プロトコル", placeholder="例：オムニパーク300 100ml")
+        
+        st.markdown("**造影プロトコル詳細**")
+        contrast_text = create_rich_text_editor(
+            content="",
+            placeholder="造影剤の種類、量、投与方法などを入力してください。",
+            key="contrast_text_editor",
+            height=200
+        )
+        
+        contrast_image = st.file_uploader("造影プロトコル画像をアップロード", type=['png', 'jpg', 'jpeg'], key="create_contrast_img_upload",
+                                        help="対応形式: PNG, JPEG, JPG（最大5MB）")
+        contrast_img_b64 = None
+        if contrast_image:
+            contrast_img_b64, error_msg = validate_and_process_image(contrast_image)
+            if contrast_img_b64 is None:
+                st.error(f"造影プロトコル画像: {error_msg}")
+            else:
+                st.image(contrast_image, caption="造影プロトコル画像プレビュー", width=300)
+        
+        st.markdown("---")
+        
+        # 画像処理
+        st.markdown("### 🖥️ 画像処理")
+        processing = st.text_input("画像処理", placeholder="例：MPR、VR、CPR")
+        
+        st.markdown("**画像処理詳細**")
+        processing_text = create_rich_text_editor(
+            content="",
+            placeholder="画像処理の手順、設定などを入力してください。",
+            key="processing_text_editor",
+            height=200
+        )
+        
+        processing_image = st.file_uploader("画像処理画像をアップロード", type=['png', 'jpg', 'jpeg'], key="create_processing_img_upload",
+                                          help="対応形式: PNG, JPEG, JPG（最大5MB）")
+        processing_img_b64 = None
+        if processing_image:
+            processing_img_b64, error_msg = validate_and_process_image(processing_image)
+            if processing_img_b64 is None:
+                st.error(f"画像処理画像: {error_msg}")
+            else:
+                st.image(processing_image, caption="画像処理画像プレビュー", width=300)
+        
+        # フォーム送信
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            submitted = st.form_submit_button("📝 疾患データを作成", use_container_width=True)
+        with col2:
+            if st.form_submit_button("🔙 戻る", use_container_width=True):
+                st.session_state.page = "search"
+                st.rerun()
+    
+    # フォーム処理
+    if submitted:
+        if not disease_name or not disease_text:
+            st.error("疾患名と疾患詳細は必須項目です")
+        else:
+            try:
+                add_sick(
+                    disease_name, disease_text, keyword or "",
+                    protocol or "", protocol_text or "",
+                    processing or "", processing_text or "",
+                    contrast or "", contrast_text or "",
+                    disease_img_b64, protocol_img_b64,
+                    processing_img_b64, contrast_img_b64
+                )
+                
+                # 作成成功フラグを設定
+                st.session_state.disease_created = True
+                st.session_state.created_disease_name = disease_name
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"データ作成中にエラーが発生しました: {str(e)}")
+    
+    # 作成完了メッセージと確認画面
+    if st.session_state.get('disease_created', False):
+        st.success("✅ 疾患データが正常に作成されました！")
+        st.balloons()
+        
+        # 作成された疾患の情報を表示
+        st.markdown(f"""
+        <div class="disease-card">
+            <h3>📋 作成完了</h3>
+            <p><strong>疾患名:</strong> {st.session_state.get('created_disease_name', '')}</p>
+            <p><strong>作成日時:</strong> {datetime.now().strftime('%Y年%m月%d日 %H:%M')}</p>
+            <p>データベースに正常に保存されました。</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # 確認後のアクションボタン
+        col1, col2, col3 = st.columns([1, 1, 1])
+        
+        with col1:
+            if st.button("🔍 検索ページに戻る", key="create_success_back_to_search", use_container_width=True):
+                # 成功フラグをクリア
+                if 'disease_created' in st.session_state:
+                    del st.session_state.disease_created
+                if 'created_disease_name' in st.session_state:
+                    del st.session_state.created_disease_name
+                st.session_state.page = "search"
+                st.rerun()
+        
+        with col2:
+            if st.button("📝 続けて作成", key="create_success_continue", use_container_width=True):
+                # 成功フラグをクリアして新規作成を続行
+                if 'disease_created' in st.session_state:
+                    del st.session_state.disease_created
+                if 'created_disease_name' in st.session_state:
+                    del st.session_state.created_disease_name
+                st.rerun()
+        
+        with col3:
+            if st.button("👁️ 作成した疾患を確認", key="create_success_view_created", use_container_width=True):
+                # 作成した疾患の詳細ページに移動
+                # 最新の疾患データを取得
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT id FROM sicks WHERE diesease = %s ORDER BY created_at DESC LIMIT 1", 
+                              (st.session_state.get('created_disease_name', ''),))
+                result = cursor.fetchone()
+                conn.close()
+                
+                if result:
+                    st.session_state.selected_sick_id = result[0]
+                    st.session_state.page = "detail"
+                    # 成功フラグをクリア
+                    if 'disease_created' in st.session_state:
+                        del st.session_state.disease_created
+                    if 'created_disease_name' in st.session_state:
+                        del st.session_state.created_disease_name
+                    st.rerun()
+        
+        # この場合は戻るボタンを表示しない
+        return
+    
+    # 戻るボタン（通常時のみ表示）
+    if st.button("戻る", key="create_disease_back_from_create"):
+        st.session_state.page = "search"
+        st.rerun()
+
+def show_edit_disease_page():
+    """疾患編集ページ（簡易版）"""
+    if 'edit_sick_id' not in st.session_state:
+        st.error("編集対象が選択されていません")
+        if st.button("検索に戻る", key="edit_disease_back_no_selection"):
+            st.session_state.page = "search"
+            st.rerun()
+        return
+    
+    sick_data = get_sick_by_id(st.session_state.edit_sick_id)
+    if not sick_data:
+        st.error("疾患データが見つかりません")
+        if st.button("検索に戻る", key="edit_disease_back_not_found"):
+            st.session_state.page = "search"
+            if 'edit_sick_id' in st.session_state:
+                del st.session_state.edit_sick_id
+            st.rerun()
+        return
+    
+    st.markdown('<div class="main-header"><h1>疾患データ編集</h1></div>', unsafe_allow_html=True)
+    st.info("編集機能は今後追加予定です。現在は閲覧のみ可能です。")
+    
+    # 現在のデータを表示
+    st.markdown(f"**疾患名:** {sick_data[1]}")
+    st.markdown("**疾患詳細:**")
+    display_rich_content(sick_data[2])
+    
+    if st.button("詳細ページに戻る", key="edit_disease_back_to_detail"):
+        st.session_state.selected_sick_id = st.session_state.edit_sick_id
+        st.session_state.page = "detail"
+        del st.session_state.edit_sick_id
+        st.rerun()
+
+def show_protocols_page():
+    """CTプロトコル一覧ページ（簡易版）"""
+    st.markdown('<div class="main-header"><h1>CTプロトコル管理</h1></div>', unsafe_allow_html=True)
+    st.info("CTプロトコル機能は今後追加予定です。")
+    
+    if st.button("ホームに戻る", key="protocols_back_to_home"):
+        st.session_state.page = "home"
+        st.rerun()
+
+def show_protocol_detail_page():
+    """CTプロトコル詳細ページ（簡易版）"""
+    st.markdown('<div class="main-header"><h1>CTプロトコル詳細</h1></div>', unsafe_allow_html=True)
+    st.info("CTプロトコル詳細機能は今後追加予定です。")
+    
+    if st.button("プロトコル一覧に戻る", key="protocol_detail_back"):
+        st.session_state.page = "protocols"
+        st.rerun()
+
+def show_create_protocol_page():
+    """CTプロトコル作成ページ（簡易版）"""
+    st.markdown('<div class="main-header"><h1>新規CTプロトコル作成</h1></div>', unsafe_allow_html=True)
+    st.info("CTプロトコル作成機能は今後追加予定です。")
+    
+    if st.button("プロトコル一覧に戻る", key="create_protocol_back"):
+        st.session_state.page = "protocols"
+        st.rerun()
+
+def show_edit_protocol_page():
+    """CTプロトコル編集ページ（簡易版）"""
+    st.markdown('<div class="main-header"><h1>CTプロトコル編集</h1></div>', unsafe_allow_html=True)
+    st.info("CTプロトコル編集機能は今後追加予定です。")
+    
+    if st.button("プロトコル一覧に戻る", key="edit_protocol_back"):
+        st.session_state.page = "protocols"
+        st.rerun()
+
+# サイドバー関数
+def show_sidebar():
+    """サイドバー表示"""
+    with st.sidebar:
+        st.markdown("### 🏥 How to CT")
+        
+        if RICH_EDITOR_AVAILABLE:
+            st.success("📝 リッチテキストエディタ対応")
+        else:
+            st.warning("📝 リッチエディタ未対応")
+        
+        if 'user' in st.session_state:
+            st.markdown(f"**ログイン中:** {st.session_state.user['name']}")
+            
+            st.markdown("---")
+            st.markdown("### 📋 メニュー")
+            
+            if st.button("🏠 ホーム", use_container_width=True, key="sidebar_home"):
+                st.session_state.page = "home"
+                st.rerun()
+            
+            if st.button("🔍 疾患検索", use_container_width=True, key="sidebar_search"):
+                st.session_state.page = "search"
+                st.rerun()
+            
+            if st.button("📢 お知らせ", use_container_width=True, key="sidebar_notices"):
+                st.session_state.page = "notices"
+                st.rerun()
+
+            if st.button("📋 CTプロトコル", use_container_width=True, key="sidebar_protocols"):
+                st.session_state.page = "protocols"
+                st.rerun()
+            
+            st.markdown("---")
+            
+            if st.button("📝 新規疾患作成", use_container_width=True, key="sidebar_create_disease"):
+                st.session_state.page = "create_disease"
+                st.rerun()
+            
+            if st.button("📝 新規お知らせ作成", use_container_width=True, key="sidebar_create_notice"):
+                st.session_state.page = "create_notice"
+                st.rerun()
+            
+            st.markdown("---")
+            
+            if st.button("🚪 ログアウト", use_container_width=True):
+                # ログアウト時にセッション情報をクリア
+                if 'user' in st.session_state:
+                    user_id = st.session_state.user['id']
+                    try:
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        cursor.execute('DELETE FROM user_sessions WHERE user_id = %s', (user_id,))
+                        conn.commit()
+                        cursor.close()
+                        conn.close()
+                    except:
+                        pass
+                for key in list(st.session_state.keys()):
+                    if key != 'db_initialized':  # DB初期化状態は保持
+                        del st.session_state[key]
+                st.session_state.page = "welcome"
+                st.rerun()
+
+            # 管理者メニュー（管理者のみ表示）
+            if is_admin_user():
+                st.markdown("---")
+                st.markdown("### 👨‍💼 管理者メニュー")
+                if st.button("ユーザー管理", use_container_width=True, key="sidebar_admin"):
+                    st.session_state.page = "admin"
+                    st.rerun()
+        
+        st.markdown("---")
+        st.markdown("### ℹ️ システム情報")
+        st.markdown("**診療放射線技師向け**")
+        st.markdown("CT検査マニュアルシステム")
+        st.markdown("疾患別プロトコル管理")
+        st.markdown("画像アップロード対応")
+        
+        if RICH_EDITOR_AVAILABLE:
+            st.markdown("リッチテキストエディタ対応")
+        else:
+            st.markdown("リッチエディタ未導入")
+            st.markdown("`pip install streamlit-quill`")
+            st.markdown("でインストールしてください")
+
+# 管理者ページ（簡略版）
+def show_admin_page():
+    """管理者専用ページ"""
+    if not is_admin_user():
+        st.error("🚫 管理者権限が必要です")
+        return
+    
+    st.markdown('<div class="main-header"><h1>管理者専用ページ</h1></div>', unsafe_allow_html=True)
+    st.markdown(f"**管理者:** {st.session_state.user['name']} ({st.session_state.user['email']})")
+    
+    # タブで機能を分ける
+    tab1, tab2 = st.tabs(["新規ユーザー作成", "ユーザー管理"])
+    
+    with tab1:
+        st.markdown("### 新規ユーザー作成")
+        
+        with st.form("admin_register_form"):
+            st.info("管理者のみが新しいユーザーアカウントを作成できます")
+            
+            name = st.text_input("氏名 *", placeholder="例：山田太郎")
+            email = st.text_input("メールアドレス *", placeholder="例：yamada@hospital.com")
+            password = st.text_input("初期パスワード *", type="password", placeholder="8文字以上推奨")
+            password_confirm = st.text_input("パスワード確認 *", type="password")
+            
+            # ユーザー種別選択（参考情報）
+            user_type = st.selectbox("ユーザー種別（参考）", [
+                "診療放射線技師", 
+                "医師", 
+                "看護師", 
+                "管理者", 
+                "その他"
+            ])
+            
+            notes = st.text_area("備考", placeholder="部署、役職、特記事項など")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                submitted = st.form_submit_button("ユーザー作成", use_container_width=True)
+            with col2:
+                if st.form_submit_button("フォームをクリア", use_container_width=True):
+                    st.rerun()
+            
+            if submitted:
+                if name and email and password and password_confirm:
+                    # メールアドレス検証を追加
+                    email_valid, email_error = validate_email(email)
+                    if not email_valid:
+                        st.error(f"❌ {email_error}")
+                        st.info("💡 正しい形式の例: yamada@hospital.com")
+                    elif password == password_confirm:
+                        if len(password) >= 6:  # パスワード長チェック
+                            if admin_register_user(name, email, password):
+                                st.success(f"✅ ユーザー「{name}」を作成しました")
+                                st.info(f"📧 ログイン情報\nメール: {email}\nパスワード: {password}")
+                                
+                                # 作成完了の詳細情報
+                                st.markdown(f"""
+                                <div class="notice-card">
+                                    <h4>作成されたユーザー情報</h4>
+                                    <ul>
+                                        <li><strong>氏名:</strong> {name}</li>
+                                        <li><strong>メールアドレス:</strong> {email}</li>
+                                        <li><strong>ユーザー種別:</strong> {user_type}</li>
+                                        <li><strong>作成日時:</strong> {datetime.now().strftime('%Y年%m月%d日 %H:%M')}</li>
+                                        {f'<li><strong>備考:</strong> {notes}</li>' if notes else ''}
+                                    </ul>
+                                    <p style="color: #ff9800;">⚠️ 初期パスワードをユーザーに安全に伝達してください</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            else:
+                                st.error("❌ このメールアドレスは既に登録されています")
+                        else:
+                            st.error("❌ パスワードは6文字以上で設定してください")
+                    else:
+                        st.error("❌ パスワードが一致しません")
+                else:
+                    st.error("❌ 全ての必須項目を入力してください")
+    
+    with tab2:
+        st.markdown("### ユーザー管理")
+        
+        # 全ユーザー一覧表示
+        df_users = get_all_users()
+        
+        if not df_users.empty:
+            st.markdown(f"**登録ユーザー数:** {len(df_users)}人")
+            
+            # ユーザー一覧をカード形式で表示
+            for idx, user in df_users.iterrows():
+                st.markdown('<div class="search-result">', unsafe_allow_html=True)
+                
+                col1, col2, col3 = st.columns([3, 1, 1])
+                
+                with col1:
+                    st.markdown(f"**👤 {user['name']}**")
+                    st.markdown(f"📧 {user['email']}")
+                    st.caption(f"登録日: {user['created_at']}")
+                
+                with col2:
+                    # 現在のユーザー自身は削除できないようにする
+                    if user['email'] != st.session_state.user['email']:
+                        if st.button("編集", key=f"edit_user_{user['id']}", disabled=True):
+                            st.info("編集機能は今後追加予定です")
+                    else:
+                        st.markdown("**(現在のユーザー)**")
+                
+                with col3:
+                    # 管理者ユーザーと現在のユーザー自身は削除不可
+                    admin_emails = ['admin@hospital.jp']
+                    if user['email'] not in admin_emails and user['email'] != st.session_state.user['email']:
+                        if st.button("削除", key=f"delete_user_{user['id']}"):
+                            # 削除確認
+                            if st.session_state.get(f'confirm_delete_user_{user["id"]}', False):
+                                delete_user(user['id'])
+                                st.success(f"ユーザー「{user['name']}」を削除しました")
+                                st.rerun()
+                            else:
+                                st.session_state[f'confirm_delete_user_{user["id"]}'] = True
+                                st.warning("もう一度削除ボタンを押すと削除されます")
+                    elif user['email'] in admin_emails:
+                        st.markdown("**(管理者)**")
+                    else:
+                        st.markdown("**(現在のユーザー)**")
+                
+                st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.info("登録ユーザーがいません")
+
+# メイン処理
 def main():
     """メイン処理"""
     # 初回のみデータベース初期化
