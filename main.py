@@ -2821,6 +2821,8 @@ def show_admin_page():
         # 最終バックアップ情報
         st.caption("💡 定期的なバックアップを推奨します（週1回以上）")
 
+
+
 # サイドバー
 def show_sidebar():
     """サイドバー表示"""
@@ -2907,44 +2909,10 @@ def show_sidebar():
             st.markdown("`pip install streamlit-quill`")
             st.markdown("でインストールしてください")
 
-# メイン処理
-def main():
-    """メイン処理"""
-    # 初回のみデータベース初期化（パフォーマンス改善）
-    if 'db_initialized' not in st.session_state:
-        init_connection()
-        try:
-            init_database()
-            insert_sample_data()
-            st.session_state.db_initialized = True
-        except Exception as e:
-            st.error(f"データベース初期化エラー: {e}")
-            st.warning("一部機能が制限される場合があります")
-    
-    # セッション状態の復元（ブラウザ更新対応）
-    if 'user' not in st.session_state:
-        # データベースからセッション情報を復元を試行
-        try:
-            session_data = load_session_from_db()
-            if session_data:
-                st.session_state.user = session_data['user']
-                st.session_state.page = session_data['page']
-        except:
-            pass  # セッション復元失敗は無視
-    
-    # ページ状態の初期化
-    if 'page' not in st.session_state:
-        st.session_state.page = "welcome"    
-    # サイドバー表示
-    if st.session_state.page != "welcome" and st.session_state.page != "login":
-        show_sidebar()
-    
-    # ページルーティング
-    if st.session_state.page == "welcome":
-        show_welcome_page()
-    elif st.session_state.page == "login":
-        show_login_page()
-    elif st.session_state.page == "home":
+def show_main_app():
+    """ログイン後のメインアプリ表示"""
+    # ページ状態に応じて適切な画面を表示
+    if st.session_state.page == "home":
         show_home_page()
     elif st.session_state.page == "search":
         show_search_page()
@@ -2972,6 +2940,54 @@ def main():
         show_edit_protocol_page()
     elif st.session_state.page == "admin":
         show_admin_page()
+    else:
+        # デフォルトはホーム画面
+        show_home_page()
 
-if __name__ == "__main__":
+# メイン処理
+def main():
+    """メイン処理"""
+    # 初回のみデータベース初期化（パフォーマンス改善）
+    if 'db_initialized' not in st.session_state:
+        init_connection()
+        try:
+            init_database()
+            insert_sample_data()
+            st.session_state.db_initialized = True
+        except Exception as e:
+            st.error(f"データベース初期化エラー: {e}")
+            st.warning("一部機能が制限される場合があります")
+    
+    # セッション状態の復元（ブラウザ更新対応）
+    if 'user' not in st.session_state:
+        # データベースからセッション情報を復元を試行
+        try:
+            session_data = load_session_from_db()
+            if session_data:
+                st.session_state.user = session_data['user']
+                st.session_state.page = session_data['page']
+        except:
+            pass  # セッション復元失敗は無視
+    
+# ページ状態の初期化
+if 'page' not in st.session_state:
+    st.session_state.page = "welcome"
+
+# ログイン状態による分岐
+if 'user' not in st.session_state:
+    # ログインしていない場合
+    if st.session_state.page == "welcome":
+        show_welcome_page()
+    elif st.session_state.page == "login":
+        show_login_page()
+    else:
+        # ログインが必要な場合はログイン画面に戻す
+        st.session_state.page = "login"
+        show_login_page()
+else:
+    # ログイン済みの場合
+    show_sidebar()  # サイドバー表示
+    show_main_app()  # メインコンテンツ表示
+
+   if __name__ == "__main__":
     main()
