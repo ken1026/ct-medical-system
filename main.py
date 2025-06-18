@@ -1297,90 +1297,90 @@ def show_create_notice_page():
                 st.error("タイトルと本文は必須項目です")
     
     if st.button("戻る", key="create_notice_back_from_create"):
-        st.session_state.page = "notices"
-        st.rerun()
+        navigate_to_page("notices")
 
 def show_edit_notice_page():
-    """お知らせ編集ページ"""
-    if 'edit_notice_id' not in st.session_state:
-        st.error("編集対象が選択されていません")
-        if st.button("お知らせ一覧に戻る", key="edit_notice_back_no_selection"):
-            navigate_to_page("notices")
-        return
-    
-    form_data = get_form_by_id(st.session_state.edit_notice_id)
-    if not form_data:
-        st.error("お知らせが見つかりません")
-        if st.button("お知らせ一覧に戻る", key="edit_notice_back_not_found"):
-            if 'edit_notice_id' in st.session_state:
-                del st.session_state.edit_notice_id
-            navigate_to_page("notices")
-        return
-    st.markdown('<div class="main-header"><h1>お知らせ編集</h1></div>', unsafe_allow_html=True)
-    
-    with st.form("edit_notice_form"):
-        title = st.text_input("タイトル *", value=form_data[1])
-        
-        # リッチテキストエディタを使用（既存データを初期値として設定）
-        st.markdown("**本文 ***")
-        main = create_rich_text_editor(
-            content=form_data[2] or "",
-            placeholder="お知らせの内容を入力してください。見出し、太字、色付け、リストなどを使って見やすく作成できます。",
-            key="edit_notice_main_editor",
-            height=400
-        )
-        
-        # お知らせ画像編集
-        st.markdown("**添付画像**")
-        if form_data[3]:  # 既存画像がある場合
-            st.markdown("現在の画像:")
-            display_image_with_caption(form_data[3], "現在のお知らせ画像", width=200)
-            replace_notice_img = st.checkbox("お知らせ画像を変更する")
-            if replace_notice_img:
-                notice_image = st.file_uploader("新しいお知らせ画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_notice_img_upload")
-                if notice_image is not None:
-                    st.image(notice_image, caption="新しいお知らせ画像", width=300)
-            else:
-                notice_image = None
-        else:
-            notice_image = st.file_uploader("お知らせ画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_notice_img_upload")
-            if notice_image is not None:
-                st.image(notice_image, caption="お知らせ画像", width=300)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            submitted = st.form_submit_button("更新", use_container_width=True)
-        with col2:
-            cancel = st.form_submit_button("キャンセル", use_container_width=True)
-        
-        if submitted:
-            if title and main:
-                try:
-                    # 画像処理（既存画像を保持するか新しい画像に更新するか）
-                    notice_img_b64 = form_data[3]  # 既存画像
-                    
-                    # 新しい画像がアップロードされた場合のみ更新
-                    if notice_image is not None:
-                        notice_img_b64, error_msg = validate_and_process_image(notice_image)
-                        if notice_img_b64 is None:
-                            st.error(f"お知らせ画像: {error_msg}")
-                            return
-                    
-                    update_form(st.session_state.edit_notice_id, title, main, notice_img_b64)
-                    st.success("お知らせを更新しました")
-                    st.session_state.selected_notice_id = st.session_state.edit_notice_id
-                    del st.session_state.edit_notice_id
-                    navigate_to_page("notice_detail")
-                    
-                except Exception as e:
-                    st.error(f"データの保存中にエラーが発生しました: {str(e)}")
-            else:
-                st.error("タイトルと本文は必須項目です")
-        
-        if cancel:
-            st.session_state.selected_notice_id = st.session_state.edit_notice_id
-            del st.session_state.edit_notice_id
-            navigate_to_page("notice_detail")
+   """お知らせ編集ページ"""
+   if 'edit_notice_id' not in st.session_state:
+       st.error("編集対象が選択されていません")
+       if st.button("お知らせ一覧に戻る", key="edit_notice_back_no_selection"):
+           navigate_to_page("notices")
+       return
+   
+   form_data = get_form_by_id(st.session_state.edit_notice_id)
+   if not form_data:
+       st.error("お知らせが見つかりません")
+       if st.button("お知らせ一覧に戻る", key="edit_notice_back_not_found"):
+           if 'edit_notice_id' in st.session_state:
+               del st.session_state.edit_notice_id
+           navigate_to_page("notices")
+       return
+   
+   st.markdown('<div class="main-header"><h1>お知らせ編集</h1></div>', unsafe_allow_html=True)
+   
+   with st.form("edit_notice_form"):
+       title = st.text_input("タイトル *", value=form_data[1])
+       
+       # リッチテキストエディタを使用（既存データを初期値として設定）
+       st.markdown("**本文 ***")
+       main = create_rich_text_editor(
+           content=form_data[2] or "",
+           placeholder="お知らせの内容を入力してください。見出し、太字、色付け、リストなどを使って見やすく作成できます。",
+           key="edit_notice_main_editor",
+           height=400
+       )
+       
+       # お知らせ画像編集
+       st.markdown("**添付画像**")
+       if form_data[3]:  # 既存画像がある場合
+           st.markdown("現在の画像:")
+           display_image_with_caption(form_data[3], "現在のお知らせ画像", width=200)
+           replace_notice_img = st.checkbox("お知らせ画像を変更する")
+           if replace_notice_img:
+               notice_image = st.file_uploader("新しいお知らせ画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_notice_img_upload")
+               if notice_image is not None:
+                   st.image(notice_image, caption="新しいお知らせ画像", width=300)
+           else:
+               notice_image = None
+       else:
+           notice_image = st.file_uploader("お知らせ画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_notice_img_upload")
+           if notice_image is not None:
+               st.image(notice_image, caption="お知らせ画像", width=300)
+       
+       col1, col2 = st.columns(2)
+       with col1:
+           submitted = st.form_submit_button("更新", use_container_width=True)
+       with col2:
+           cancel = st.form_submit_button("キャンセル", use_container_width=True)
+       
+       if submitted:
+           if title and main:
+               try:
+                   # 画像処理（既存画像を保持するか新しい画像に更新するか）
+                   notice_img_b64 = form_data[3]  # 既存画像
+                   
+                   # 新しい画像がアップロードされた場合のみ更新
+                   if notice_image is not None:
+                       notice_img_b64, error_msg = validate_and_process_image(notice_image)
+                       if notice_img_b64 is None:
+                           st.error(f"お知らせ画像: {error_msg}")
+                           return
+                   
+                   update_form(st.session_state.edit_notice_id, title, main, notice_img_b64)
+                   st.success("お知らせを更新しました")
+                   st.session_state.selected_notice_id = st.session_state.edit_notice_id
+                   del st.session_state.edit_notice_id
+                   navigate_to_page("notice_detail")
+                   
+               except Exception as e:
+                   st.error(f"データの保存中にエラーが発生しました: {str(e)}")
+           else:
+               st.error("タイトルと本文は必須項目です")
+       
+       if cancel:
+           st.session_state.selected_notice_id = st.session_state.edit_notice_id
+           del st.session_state.edit_notice_id
+           navigate_to_page("notice_detail")
 
 def show_create_disease_page():
     """疾患データ作成ページ"""
@@ -1668,30 +1668,24 @@ def show_sidebar():
             st.markdown("### 📋 メニュー")
             
             if st.button("🏠 ホーム", use_container_width=True, key="sidebar_home"):
-                st.session_state.page = "home"
-                st.rerun()
+                navigate_to_page("home")
             
             if st.button("🔍 疾患検索", use_container_width=True, key="sidebar_search"):
-                st.session_state.page = "search"
-                st.rerun()
+                navigate_to_page("search")
             
             if st.button("📢 お知らせ", use_container_width=True, key="sidebar_notices"):
-                st.session_state.page = "notices"
-                st.rerun()
+                navigate_to_page("notices")
 
             if st.button("📋 CTプロトコル", use_container_width=True, key="sidebar_protocols"):
-                st.session_state.page = "protocols"
-                st.rerun()
+                navigate_to_page("protocols")
             
             st.markdown("---")
             
             if st.button("📝 新規疾患作成", use_container_width=True, key="sidebar_create_disease"):
-                st.session_state.page = "create_disease"
-                st.rerun()
+                navigate_to_page("create_disease")
             
             if st.button("📝 新規お知らせ作成", use_container_width=True, key="sidebar_create_notice"):
-                st.session_state.page = "create_notice"
-                st.rerun()
+                navigate_to_page("create_notice")
             
             st.markdown("---")
             
