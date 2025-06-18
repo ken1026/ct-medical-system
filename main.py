@@ -1236,11 +1236,16 @@ def show_notice_detail_page():
     if st.button("削除", key="notice_detail_delete_notice"):
         if st.session_state.get('confirm_delete_notice', False):
             delete_form(form_data[0])
+            # キャッシュをクリアして最新データを取得
+            get_all_forms.clear()
             st.success("お知らせを削除しました")
             if 'confirm_delete_notice' in st.session_state:
                 del st.session_state.confirm_delete_notice
             if 'selected_notice_id' in st.session_state:
                 del st.session_state.selected_notice_id
+            # 少し待ってからページ遷移
+            import time
+            time.sleep(0.5)
             navigate_to_page("notices")
         else:
             st.session_state.confirm_delete_notice = True
@@ -1287,9 +1292,10 @@ def show_create_notice_page():
                             return
                     
                     add_form(title, main, notice_img_b64)
+                    # キャッシュをクリアして最新データを取得
+                    get_all_forms.clear()
                     st.success("お知らせを登録しました")
-                    st.session_state.page = "notices"
-                    st.rerun()
+                    navigate_to_page("notices")
                     
                 except Exception as e:
                     st.error(f"データの保存中にエラーが発生しました: {str(e)}")
@@ -1367,10 +1373,12 @@ def show_edit_notice_page():
                            return
                    
                    update_form(st.session_state.edit_notice_id, title, main, notice_img_b64)
-                   st.success("お知らせを更新しました")
-                   st.session_state.selected_notice_id = st.session_state.edit_notice_id
-                   del st.session_state.edit_notice_id
-                   navigate_to_page("notice_detail")
+                    # キャッシュをクリアして最新データを取得
+                    get_all_forms.clear()
+                    st.success("お知らせを更新しました")
+                    st.session_state.selected_notice_id = st.session_state.edit_notice_id
+                    del st.session_state.edit_notice_id
+                    navigate_to_page("notice_detail")
                    
                except Exception as e:
                    st.error(f"データの保存中にエラーが発生しました: {str(e)}")
