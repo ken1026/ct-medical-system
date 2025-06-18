@@ -119,6 +119,43 @@ def update_session_in_db():
         }
         save_session_to_db(st.session_state.user['id'], session_data)
 
+# ページ履歴管理関数
+def add_to_page_history(page):
+    """ページ履歴に追加"""
+    if 'page_history' not in st.session_state:
+        st.session_state.page_history = []
+    
+    # 同じページの連続追加を避ける
+    if not st.session_state.page_history or st.session_state.page_history[-1] != page:
+        st.session_state.page_history.append(page)
+        
+    # 履歴が長くなりすぎないように制限（最大10ページ）
+    if len(st.session_state.page_history) > 10:
+        st.session_state.page_history = st.session_state.page_history[-10:]
+
+def go_back():
+    """前のページに戻る"""
+    if 'page_history' not in st.session_state or len(st.session_state.page_history) <= 1:
+        # 履歴がない場合はホームに戻る
+        st.session_state.page = "home"
+        return
+    
+    # 現在のページを履歴から削除
+    st.session_state.page_history.pop()
+    
+    # 前のページに戻る
+    if st.session_state.page_history:
+        previous_page = st.session_state.page_history[-1]
+        st.session_state.page = previous_page
+    else:
+        st.session_state.page = "home"
+
+def navigate_to_page(page):
+    """ページナビゲーション（履歴付き）"""
+    add_to_page_history(st.session_state.get('page', 'home'))
+    st.session_state.page = page
+    st.rerun()
+
 # カスタムCSS
 st.markdown("""
 <style>
@@ -764,7 +801,7 @@ def validate_email(email):
         return False, "メールアドレスに@マークが含まれていません"
     
     # より詳細な正規表現チェック
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}
     if not re.match(email_pattern, email):
         return False, "メールアドレスの形式が正しくありません"
     
@@ -874,8 +911,7 @@ def show_home_page():
     """, unsafe_allow_html=True)
     
     if st.button("疾患検索を開始", key="search_button", use_container_width=True):
-        st.session_state.page = "search"
-        st.rerun()
+        navigate_to_page("search")
     
     st.markdown('<h3 class="section-title">最新のお知らせ</h3>', unsafe_allow_html=True)
     df_forms = get_all_forms()
@@ -888,8 +924,7 @@ def show_home_page():
                 st.caption(f"投稿日: {row['created_at']}")
                 if st.button("詳細を見る", key=f"home_notice_preview_{row['id']}"):
                     st.session_state.selected_notice_id = row['id']
-                    st.session_state.page = "notice_detail"
-                    st.rerun()
+                    navigate_to_page("notice_detail")
     else:
         st.info("お知らせがありません")
 
@@ -906,8 +941,7 @@ def show_search_page():
     col1, col2 = st.columns(2)
     with col1:
         if st.button("新規疾患データ作成", key="search_create_new"):
-            st.session_state.page = "create_disease"
-            st.rerun()
+            navigate_to_page("create_disease")
     with col2:
         if st.button("全疾患一覧を表示", key="search_show_all"):
             st.session_state.show_all_diseases = True
@@ -948,9 +982,7 @@ def show_search_page():
                 with col2:
                     if st.button("詳細を見る", key=f"search_detail_{row['id']}"):
                         st.session_state.selected_sick_id = int(row['id'])
-                        st.session_state.page = "detail"
-                        # 検索結果を保持
-                        st.rerun()
+                        navigate_to_page("detail")
                 
                 st.markdown('</div>', unsafe_allow_html=True)
             
@@ -988,10 +1020,9 @@ def show_search_page():
                 with col2:
                     if st.button("詳細を見る", key=f"all_detail_{row['id']}"):
                         st.session_state.selected_sick_id = int(row['id'])
-                        st.session_state.page = "detail"
                         if 'show_all_diseases' in st.session_state:
                             del st.session_state.show_all_diseases
-                        st.rerun()
+                        navigate_to_page("detail")
                 
                 st.markdown('</div>', unsafe_allow_html=True)
         
@@ -1098,30 +1129,33 @@ def show_detail_page():
         st.markdown('</div>', unsafe_allow_html=True)
     
     # 編集・削除・戻るボタン
-    if st.button("編集", key="detail_edit_disease"):
-        st.session_state.edit_sick_id = sick_data[0]
-        st.session_state.page = "edit_disease"
-        st.rerun()
+    col1, col2, col3 = st.columns(3)
     
-    if st.button("削除", key="detail_delete_disease"):
-        if st.session_state.get('confirm_delete', False):
-            delete_sick(sick_data[0])
-            st.success("疾患データを削除しました")
-            st.session_state.page = "search"
-            if 'confirm_delete' in st.session_state:
-                del st.session_state.confirm_delete
+    with col1:
+        if st.button("編集", key="detail_edit_disease", use_container_width=True):
+            st.session_state.edit_sick_id = sick_data[0]
+            navigate_to_page("edit_disease")
+    
+    with col2:
+        if st.button("削除", key="detail_delete_disease", use_container_width=True):
+            if st.session_state.get('confirm_delete', False):
+                delete_sick(sick_data[0])
+                st.success("疾患データを削除しました")
+                st.session_state.page = "search"
+                if 'confirm_delete' in st.session_state:
+                    del st.session_state.confirm_delete
+                if 'selected_sick_id' in st.session_state:
+                    del st.session_state.selected_sick_id
+                st.rerun()
+            else:
+                st.session_state.confirm_delete = True
+                st.warning("削除ボタンをもう一度押すと削除されます")
+    
+    with col3:
+        if st.button("⬅️ 戻る", key="detail_back", use_container_width=True):
             if 'selected_sick_id' in st.session_state:
                 del st.session_state.selected_sick_id
-            st.rerun()
-        else:
-            st.session_state.confirm_delete = True
-            st.warning("削除ボタンをもう一度押すと削除されます")
-    
-    if st.button("検索に戻る", key="detail_back_to_search"):
-        st.session_state.page = "search"
-        if 'selected_sick_id' in st.session_state:
-            del st.session_state.selected_sick_id
-        st.rerun()
+            go_back()
 
 def show_notices_page():
     """お知らせ一覧ページ"""
@@ -1690,8 +1724,7 @@ def show_sidebar():
                 st.markdown("---")
                 st.markdown("### 👨‍💼 管理者メニュー")
                 if st.button("ユーザー管理", use_container_width=True, key="sidebar_admin"):
-                    st.session_state.page = "admin"
-                    st.rerun()
+                    navigate_to_page("admin")
         
         st.markdown("---")
         st.markdown("### ℹ️ システム情報")
