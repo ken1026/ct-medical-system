@@ -1242,15 +1242,17 @@ def show_notice_detail_page():
                 del st.session_state.confirm_delete_notice
             if 'selected_notice_id' in st.session_state:
                 del st.session_state.selected_notice_id
-            navigate_to_page("notices")
+            st.session_state.page = "notices"
+            st.rerun()
         else:
             st.session_state.confirm_delete_notice = True
             st.warning("削除ボタンをもう一度押すと削除されます")
     
     if st.button("戻る", key="notice_detail_back_to_notices"):
+        st.session_state.page = "notices"
         if 'selected_notice_id' in st.session_state:
             del st.session_state.selected_notice_id
-        navigate_to_page("notices") 
+        st.rerun()
 
 def show_create_notice_page():
     """お知らせ作成ページ"""
