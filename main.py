@@ -1125,6 +1125,9 @@ def show_welcome_page():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("システムを開始", key="start_system", use_container_width=True):
+            # ログイン状態をクリアしてからログイン画面へ
+            if 'user' in st.session_state:
+                del st.session_state.user
             st.session_state.page = "login"
             st.rerun()
 
@@ -2981,11 +2984,15 @@ if 'user' not in st.session_state:
     elif st.session_state.page == "login":
         show_login_page()
     else:
-        # ログインが必要な場合はログイン画面に戻す
-        st.session_state.page = "login"
-        show_login_page()
+        # その他のページはログイン画面に戻す
+        st.session_state.page = "welcome"
+        show_welcome_page()
 else:
     # ログイン済みの場合
+    # ウェルカムページにいる場合はホームに移動
+    if st.session_state.page == "welcome":
+        st.session_state.page = "home"
+    
     show_sidebar()  # サイドバー表示
     show_main_app()  # メインコンテンツ表示
 
