@@ -2989,5 +2989,5 @@ else:
     show_sidebar()  # サイドバー表示
     show_main_app()  # メインコンテンツ表示
 
-   if __name__ == "__main__":
+if __name__ == "__main__":
     main()
