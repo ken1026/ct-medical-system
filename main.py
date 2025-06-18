@@ -893,7 +893,7 @@ def show_login_page():
                     if user:
                         st.session_state.user = {'id': user[0], 'name': user[1], 'email': user[2]}
                         st.session_state.page = "home"
-			st.query_params['page'] = "home"
+                        st.query_params['page'] = "home"
                         st.success(f"ログインしました - {user[1]}さん")
                         st.rerun()
                     else:
