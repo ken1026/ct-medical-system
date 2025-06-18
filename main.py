@@ -764,7 +764,7 @@ def validate_email(email):
         return False, "メールアドレスに@マークが含まれていません"
     
     # より詳細な正規表現チェック
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     if not re.match(email_pattern, email):
         return False, "メールアドレスの形式が正しくありません"
     
