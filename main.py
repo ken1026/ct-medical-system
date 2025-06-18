@@ -1359,31 +1359,29 @@ def show_edit_notice_page():
            cancel = st.form_submit_button("キャンセル", use_container_width=True)
        
        if submitted:
-           if title and main:
-               try:
-                   # 画像処理（既存画像を保持するか新しい画像に更新するか）
-                   notice_img_b64 = form_data[3]  # 既存画像
-                   
-                   # 新しい画像がアップロードされた場合のみ更新
-                   if notice_image is not None:
-                       notice_img_b64, error_msg = validate_and_process_image(notice_image)
-                       if notice_img_b64 is None:
-                           st.error(f"お知らせ画像: {error_msg}")
-                           return
-                   
-                   update_form(st.session_state.edit_notice_id, title, main, notice_img_b64)
-                    # キャッシュをクリアして最新データを取得
+            if title and main:
+                try:                                    # ← この位置
+                    # 画像処理（既存画像を保持するか新しい画像に更新するか）
+                    notice_img_b64 = form_data[3]  # 既存画像
+                    
+                    # 新しい画像がアップロードされた場合のみ更新
+                    if notice_image is not None:
+                        notice_img_b64, error_msg = validate_and_process_image(notice_image)
+                        if notice_img_b64 is None:
+                            st.error(f"お知らせ画像: {error_msg}")
+                            return
+                    
+                    update_form(st.session_state.edit_notice_id, title, main, notice_img_b64)
                     get_all_forms.clear()
                     st.success("お知らせを更新しました")
                     st.session_state.selected_notice_id = st.session_state.edit_notice_id
                     del st.session_state.edit_notice_id
                     navigate_to_page("notice_detail")
-                   
-               except Exception as e:
-                   st.error(f"データの保存中にエラーが発生しました: {str(e)}")
-           else:
-               st.error("タイトルと本文は必須項目です")
-       
+                    
+                except Exception as e:                  # ← この位置（tryと同じレベル）
+                    st.error(f"データの保存中にエラーが発生しました: {str(e)}")
+            else:
+                st.error("タイトルと本文は必須項目です")       
        if cancel:
            st.session_state.selected_notice_id = st.session_state.edit_notice_id
            del st.session_state.edit_notice_id
