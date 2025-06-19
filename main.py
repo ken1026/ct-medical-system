@@ -1071,7 +1071,7 @@ def show_detail_page():
             st.rerun()
         return
     
-    st.title(f"{sick_data[1]} - 詳細マニュアル")
+    st.title(f"{sick_data[1]}")
     
     # 作成日・更新日表示
     col1, col2 = st.columns(2)
@@ -1464,7 +1464,7 @@ def show_create_disease_page():
         
         # 造影プロトコル
         st.markdown("### 💉 造影プロトコル")
-        contrast = st.text_input("造影プロトコル", placeholder="例：オムニパーク300 100ml")
+        contrast = st.text_input("造影プロトコル", placeholder="胸部～骨盤ルーチン")
         
         st.markdown("**造影プロトコル詳細**")
         contrast_text = create_rich_text_editor(
@@ -2235,21 +2235,16 @@ def show_sidebar():
     with st.sidebar:
         st.markdown("### 🏥 How to CT")
         
-        if RICH_EDITOR_AVAILABLE:
-            st.success("📝 リッチテキストエディタ対応")
-        else:
-            st.warning("📝 リッチエディタ未対応")
+        # if RICH_EDITOR_AVAILABLE:
+        #     st.success("📝 リッチテキストエディタ対応")
+        # else:
+        #     st.warning("📝 リッチエディタ未対応")
         
         if 'user' in st.session_state:
             st.markdown(f"**ログイン中:** {st.session_state.user['name']}")
             
-            if 'page_history' in st.session_state and len(st.session_state.page_history) > 1:
-                if st.button("⬅️ 戻る", use_container_width=True, key="sidebar_back"):
-                    current_page = st.session_state.get('page', 'home')
-                    go_back()
-                    st.rerun()
-                st.markdown("---")
-
+            
+            st.markdown("---")
             st.markdown("### 📋 メニュー")
             
             if st.button("🏠 ホーム", use_container_width=True, key="sidebar_home"):
