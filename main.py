@@ -1577,7 +1577,8 @@ def show_create_disease_page():
                     del st.session_state.disease_created
                 if 'created_disease_name' in st.session_state:
                     del st.session_state.created_disease_name
-                st.rerun()
+                # 新規作成ページに明示的に遷移
+                navigate_to_page("create_disease")
         
         with col3:
             if st.button("👁️ 作成した疾患を確認", key="create_success_view_created", use_container_width=True):
@@ -1607,77 +1608,220 @@ def show_create_disease_page():
         navigate_to_page("search")
 
 def show_edit_disease_page():
-    """疾患編集ページ（完全版）"""
-    if 'edit_sick_id' not in st.session_state:
-        st.error("編集対象が選択されていません")
-        if st.button("検索に戻る", key="edit_disease_back_no_selection"):
-            navigate_to_page("search")
-        return
-    
-    sick_data = get_sick_by_id(st.session_state.edit_sick_id)
-    if not sick_data:
-        st.error("疾患データが見つかりません")
-        if st.button("検索に戻る", key="edit_disease_back_not_found"):
-            if 'edit_sick_id' in st.session_state:
-                del st.session_state.edit_sick_id
-            navigate_to_page("search")
-        return
-    
-    st.markdown('<div class="main-header"><h1>疾患データ編集</h1></div>', unsafe_allow_html=True)
-    
-    with st.form("edit_disease_form"):
-        # 疾患情報
-        st.markdown("### 📋 疾患情報")
-        disease_name = st.text_input("疾患名 *", value=sick_data[1])
-        
-        # リッチテキストエディタで疾患詳細
-        st.markdown("**疾患詳細 ***")
-        disease_text = create_rich_text_editor(
-            content=sick_data[2] or "",
-            placeholder="疾患の概要、原因、症状などを入力してください。",
-            key="edit_disease_text_editor",
-            height=300
-        )
-        
-        keyword = st.text_input("症状・キーワード", value=sick_data[3] or "")
-        
-        # 他のフィールドも同様に実装...（簡略化）
-        
-        # フォーム送信
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            submitted = st.form_submit_button("💾 更新", use_container_width=True)
-        with col2:
-            cancel = st.form_submit_button("❌ キャンセル", use_container_width=True)
-    
-    # フォーム処理
-    if submitted:
-        if disease_name and disease_text:
-            try:
-                update_sick(
-                    st.session_state.edit_sick_id,
-                    disease_name, disease_text, keyword,
-                    # 他のパラメータ...
-                )
-                
-                # キャッシュクリア
-                get_all_sicks.clear()
-                search_sicks.clear()
-                
-                st.success("疾患データを更新しました")
-                st.session_state.selected_sick_id = st.session_state.edit_sick_id
-                del st.session_state.edit_sick_id
-                navigate_to_page("detail")
-                
-            except Exception as e:
-                st.error(f"データ更新中にエラーが発生しました: {str(e)}")
-        else:
-            st.error("疾患名と疾患詳細は必須項目です")
-    
-    if cancel:
-        st.session_state.selected_sick_id = st.session_state.edit_sick_id
-        del st.session_state.edit_sick_id
-        navigate_to_page("detail")
+   """疾患編集ページ（完全版）"""
+   if 'edit_sick_id' not in st.session_state:
+       st.error("編集対象が選択されていません")
+       if st.button("検索に戻る", key="edit_disease_back_no_selection"):
+           navigate_to_page("search")
+       return
+   
+   sick_data = get_sick_by_id(st.session_state.edit_sick_id)
+   if not sick_data:
+       st.error("疾患データが見つかりません")
+       if st.button("検索に戻る", key="edit_disease_back_not_found"):
+           if 'edit_sick_id' in st.session_state:
+               del st.session_state.edit_sick_id
+           navigate_to_page("search")
+       return
+   
+   st.markdown('<div class="main-header"><h1>疾患データ編集</h1></div>', unsafe_allow_html=True)
+   
+   with st.form("edit_disease_form"):
+       # 疾患情報
+       st.markdown("### 📋 疾患情報")
+       disease_name = st.text_input("疾患名 *", value=sick_data[1])
+       
+       # リッチテキストエディタで疾患詳細
+       st.markdown("**疾患詳細 ***")
+       disease_text = create_rich_text_editor(
+           content=sick_data[2] or "",
+           placeholder="疾患の概要、原因、症状などを入力してください。太字、色付け、リストなども使用できます。",
+           key="edit_disease_text_editor",
+           height=300
+       )
+       
+       keyword = st.text_input("症状・キーワード", value=sick_data[3] or "")
+       
+       # 疾患画像編集
+       st.markdown("**疾患関連画像**")
+       if sick_data[10]:  # 既存画像がある場合
+           st.markdown("現在の画像:")
+           display_image_with_caption(sick_data[10], "現在の疾患画像", width=200)
+           replace_disease_img = st.checkbox("疾患画像を変更する")
+           if replace_disease_img:
+               disease_image = st.file_uploader("新しい疾患画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_disease_img_upload")
+               if disease_image is not None:
+                   st.image(disease_image, caption="新しい疾患画像", width=300)
+           else:
+               disease_image = None
+       else:
+           disease_image = st.file_uploader("疾患画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_disease_img_upload")
+           if disease_image is not None:
+               st.image(disease_image, caption="疾患画像", width=300)
+       
+       st.markdown("---")
+       
+       # 撮影プロトコル
+       st.markdown("### 📸 撮影プロトコル")
+       protocol = st.text_input("撮影プロトコル", value=sick_data[4] or "")
+       
+       st.markdown("**撮影プロトコル詳細**")
+       protocol_text = create_rich_text_editor(
+           content=sick_data[5] or "",
+           placeholder="撮影手順、設定値などを入力してください。",
+           key="edit_protocol_text_editor",
+           height=200
+       )
+       
+       # 撮影プロトコル画像編集
+       st.markdown("**撮影プロトコル画像**")
+       if sick_data[11]:  # 既存画像がある場合
+           st.markdown("現在の画像:")
+           display_image_with_caption(sick_data[11], "現在の撮影プロトコル画像", width=200)
+           replace_protocol_img = st.checkbox("撮影プロトコル画像を変更する")
+           if replace_protocol_img:
+               protocol_image = st.file_uploader("新しい撮影プロトコル画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_protocol_img_upload")
+               if protocol_image is not None:
+                   st.image(protocol_image, caption="新しい撮影プロトコル画像", width=300)
+           else:
+               protocol_image = None
+       else:
+           protocol_image = st.file_uploader("撮影プロトコル画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_protocol_img_upload")
+           if protocol_image is not None:
+               st.image(protocol_image, caption="撮影プロトコル画像", width=300)
+       
+       st.markdown("---")
+       
+       # 造影プロトコル
+       st.markdown("### 💉 造影プロトコル")
+       contrast = st.text_input("造影プロトコル", value=sick_data[8] or "")
+       
+       st.markdown("**造影プロトコル詳細**")
+       contrast_text = create_rich_text_editor(
+           content=sick_data[9] or "",
+           placeholder="造影剤の種類、量、投与方法などを入力してください。",
+           key="edit_contrast_text_editor",
+           height=200
+       )
+       
+       # 造影プロトコル画像編集
+       st.markdown("**造影プロトコル画像**")
+       if sick_data[13]:  # 既存画像がある場合
+           st.markdown("現在の画像:")
+           display_image_with_caption(sick_data[13], "現在の造影プロトコル画像", width=200)
+           replace_contrast_img = st.checkbox("造影プロトコル画像を変更する")
+           if replace_contrast_img:
+               contrast_image = st.file_uploader("新しい造影プロトコル画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_contrast_img_upload")
+               if contrast_image is not None:
+                   st.image(contrast_image, caption="新しい造影プロトコル画像", width=300)
+           else:
+               contrast_image = None
+       else:
+           contrast_image = st.file_uploader("造影プロトコル画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_contrast_img_upload")
+           if contrast_image is not None:
+               st.image(contrast_image, caption="造影プロトコル画像", width=300)
+       
+       st.markdown("---")
+       
+       # 画像処理
+       st.markdown("### 🖥️ 画像処理")
+       processing = st.text_input("画像処理", value=sick_data[6] or "")
+       
+       st.markdown("**画像処理詳細**")
+       processing_text = create_rich_text_editor(
+           content=sick_data[7] or "",
+           placeholder="画像処理の手順、設定などを入力してください。",
+           key="edit_processing_text_editor",
+           height=200
+       )
+       
+       # 画像処理画像編集
+       st.markdown("**画像処理画像**")
+       if sick_data[12]:  # 既存画像がある場合
+           st.markdown("現在の画像:")
+           display_image_with_caption(sick_data[12], "現在の画像処理画像", width=200)
+           replace_processing_img = st.checkbox("画像処理画像を変更する")
+           if replace_processing_img:
+               processing_image = st.file_uploader("新しい画像処理画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_processing_img_upload")
+               if processing_image is not None:
+                   st.image(processing_image, caption="新しい画像処理画像", width=300)
+           else:
+               processing_image = None
+       else:
+           processing_image = st.file_uploader("画像処理画像をアップロード", type=['png', 'jpg', 'jpeg'], key="edit_processing_img_upload")
+           if processing_image is not None:
+               st.image(processing_image, caption="画像処理画像", width=300)
+       
+       # フォーム送信
+       col1, col2 = st.columns([1, 1])
+       with col1:
+           submitted = st.form_submit_button("💾 更新", use_container_width=True)
+       with col2:
+           cancel = st.form_submit_button("❌ キャンセル", use_container_width=True)
+   
+   # フォーム処理
+   if submitted:
+       if not disease_name or not disease_text:
+           st.error("疾患名と疾患詳細は必須項目です")
+       else:
+           try:
+               # 画像処理（既存画像を保持するか新しい画像に更新するか）
+               disease_img_b64 = sick_data[10]  # 既存画像
+               protocol_img_b64 = sick_data[11]
+               processing_img_b64 = sick_data[12]
+               contrast_img_b64 = sick_data[13]
+               
+               # 新しい画像がアップロードされた場合のみ更新
+               if disease_image is not None:
+                   disease_img_b64, error_msg = validate_and_process_image(disease_image)
+                   if disease_img_b64 is None:
+                       st.error(f"疾患画像: {error_msg}")
+                       return
+               
+               if protocol_image is not None:
+                   protocol_img_b64, error_msg = validate_and_process_image(protocol_image)
+                   if protocol_img_b64 is None:
+                       st.error(f"撮影プロトコル画像: {error_msg}")
+                       return
+               
+               if contrast_image is not None:
+                   contrast_img_b64, error_msg = validate_and_process_image(contrast_image)
+                   if contrast_img_b64 is None:
+                       st.error(f"造影プロトコル画像: {error_msg}")
+                       return
+               
+               if processing_image is not None:
+                   processing_img_b64, error_msg = validate_and_process_image(processing_image)
+                   if processing_img_b64 is None:
+                       st.error(f"画像処理画像: {error_msg}")
+                       return
+               
+               update_sick(
+                   st.session_state.edit_sick_id,
+                   disease_name, disease_text, keyword,
+                   protocol, protocol_text,
+                   processing, processing_text,
+                   contrast, contrast_text,
+                   disease_img_b64, protocol_img_b64,
+                   processing_img_b64, contrast_img_b64
+               )
+               
+               # キャッシュクリア
+               get_all_sicks.clear()
+               search_sicks.clear()
+               
+               st.success("疾患データを更新しました")
+               st.session_state.selected_sick_id = st.session_state.edit_sick_id
+               del st.session_state.edit_sick_id
+               navigate_to_page("detail")
+               
+           except Exception as e:
+               st.error(f"データ更新中にエラーが発生しました: {str(e)}")
+   
+   if cancel:
+       st.session_state.selected_sick_id = st.session_state.edit_sick_id
+       del st.session_state.edit_sick_id
+       navigate_to_page("detail")
 
 def show_protocols_page():
     """CTプロトコル一覧ページ"""
