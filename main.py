@@ -721,6 +721,7 @@ def delete_sick(sick_id):
     conn.commit()
     conn.close()
 
+@st.cache_data(ttl=300)
 def get_all_protocols():
     """全CTプロトコルを取得"""
     conn = get_db_connection()
@@ -728,6 +729,7 @@ def get_all_protocols():
     conn.close()
     return df
 
+@st.cache_data(ttl=300)
 def get_protocols_by_category(category):
     """カテゴリー別CTプロトコルを取得"""
     conn = get_db_connection()
@@ -735,6 +737,7 @@ def get_protocols_by_category(category):
     conn.close()
     return df
 
+@st.cache_data(ttl=300)
 def search_protocols(search_term):
     """CTプロトコルを検索"""
     conn = get_db_connection()
