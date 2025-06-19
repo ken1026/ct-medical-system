@@ -138,7 +138,7 @@ def add_to_page_history(page):
         st.session_state.page_history = st.session_state.page_history[-10:]
 
 def go_back():
-    """前のページに戻る"""
+    """前のページに戻る（改善版）"""
     if 'page_history' not in st.session_state or len(st.session_state.page_history) <= 1:
         # 履歴がない場合はホームに戻る
         st.session_state.page = "home"
@@ -151,6 +151,17 @@ def go_back():
     if st.session_state.page_history:
         previous_page = st.session_state.page_history[-1]
         st.session_state.page = previous_page
+        
+        # 選択状態をクリア（必要に応じて）
+        if previous_page == "protocols":
+            if 'selected_protocol_id' in st.session_state:
+                del st.session_state.selected_protocol_id
+        elif previous_page == "notices":
+            if 'selected_notice_id' in st.session_state:
+                del st.session_state.selected_notice_id
+        elif previous_page == "search":
+            if 'selected_sick_id' in st.session_state:
+                del st.session_state.selected_sick_id
     else:
         st.session_state.page = "home"
 
@@ -1766,7 +1777,10 @@ def show_protocol_detail_page():
     if st.button("削除", key="protocol_detail_delete"):
         if st.session_state.get('confirm_delete_protocol', False):
             delete_protocol(protocol_data[0])
-            get_all_protocols.clear()  # キャッシュクリア
+            # 全てのプロトコル関連キャッシュをクリア
+            get_all_protocols.clear()
+            get_protocols_by_category.clear()
+            search_protocols.clear()
             st.success("プロトコルを削除しました")
             if 'confirm_delete_protocol' in st.session_state:
                 del st.session_state.confirm_delete_protocol
@@ -2037,7 +2051,12 @@ def show_sidebar():
         if 'user' in st.session_state:
             st.markdown(f"**ログイン中:** {st.session_state.user['name']}")
             
-            st.markdown("---")
+            if 'page_history' in st.session_state and len(st.session_state.page_history) > 1:
+                if st.button("⬅️ 戻る", use_container_width=True, key="sidebar_back"):
+                    go_back()
+                    st.rerun()
+                st.markdown("---")
+
             st.markdown("### 📋 メニュー")
             
             if st.button("🏠 ホーム", use_container_width=True, key="sidebar_home"):
