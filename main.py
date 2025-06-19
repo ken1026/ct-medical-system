@@ -1514,36 +1514,34 @@ def show_create_disease_page():
             submitted = st.form_submit_button("📝 疾患データを作成", use_container_width=True)
         with col2:
             if st.form_submit_button("🔙 戻る", use_container_width=True):
-                st.session_state.page = "search"
-                st.rerun()
+                navigate_to_page("search")
     
     # フォーム処理
-    # フォーム処理
-if submitted:
-    if not disease_name or not disease_text:
-        st.error("疾患名と疾患詳細は必須項目です")
-    else:
-        try:
-            add_sick(
-                disease_name, disease_text, keyword or "",
-                protocol or "", protocol_text or "",
-                processing or "", processing_text or "",
-                contrast or "", contrast_text or "",
-                disease_img_b64, protocol_img_b64,
-                processing_img_b64, contrast_img_b64
-            )
-            
-            # キャッシュクリア追加
-            get_all_sicks.clear()
-            search_sicks.clear()
-            
-            # 作成成功フラグを設定
-            st.session_state.disease_created = True
-            st.session_state.created_disease_name = disease_name
-            st.rerun()
-            
-        except Exception as e:
-            st.error(f"データ作成中にエラーが発生しました: {str(e)}")
+    if submitted:
+        if not disease_name or not disease_text:
+            st.error("疾患名と疾患詳細は必須項目です")
+        else:
+            try:
+                add_sick(
+                    disease_name, disease_text, keyword or "",
+                    protocol or "", protocol_text or "",
+                    processing or "", processing_text or "",
+                    contrast or "", contrast_text or "",
+                    disease_img_b64, protocol_img_b64,
+                    processing_img_b64, contrast_img_b64
+                )
+                
+                # キャッシュクリア追加
+                get_all_sicks.clear()
+                search_sicks.clear()
+                
+                # 作成成功フラグを設定
+                st.session_state.disease_created = True
+                st.session_state.created_disease_name = disease_name
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"データ作成中にエラーが発生しました: {str(e)}")
     
     # 作成完了メッセージと確認画面
     if st.session_state.get('disease_created', False):
@@ -1570,8 +1568,7 @@ if submitted:
                     del st.session_state.disease_created
                 if 'created_disease_name' in st.session_state:
                     del st.session_state.created_disease_name
-                st.session_state.page = "search"
-                st.rerun()
+                navigate_to_page("search")
         
         with col2:
             if st.button("📝 続けて作成", key="create_success_continue", use_container_width=True):
@@ -1595,21 +1592,19 @@ if submitted:
                 
                 if result:
                     st.session_state.selected_sick_id = result[0]
-                    st.session_state.page = "detail"
                     # 成功フラグをクリア
                     if 'disease_created' in st.session_state:
                         del st.session_state.disease_created
                     if 'created_disease_name' in st.session_state:
                         del st.session_state.created_disease_name
-                    st.rerun()
+                    navigate_to_page("detail")
         
         # この場合は戻るボタンを表示しない
         return
     
     # 戻るボタン（通常時のみ表示）
     if st.button("戻る", key="create_disease_back_from_create"):
-        st.session_state.page = "search"
-        st.rerun()
+        navigate_to_page("search")
 
 def show_edit_disease_page():
     """疾患編集ページ（完全版）"""
