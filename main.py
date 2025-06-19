@@ -140,7 +140,6 @@ def add_to_page_history(page):
 def go_back():
     """前のページに戻る（改善版）"""
     if 'page_history' not in st.session_state or len(st.session_state.page_history) <= 1:
-        # 履歴がない場合はホームに戻る
         st.session_state.page = "home"
         return
     
@@ -152,7 +151,7 @@ def go_back():
         previous_page = st.session_state.page_history[-1]
         st.session_state.page = previous_page
         
-        # 選択状態をクリア（必要に応じて）
+        # ページ遷移後に選択状態をクリア（遷移完了後）
         if previous_page == "protocols":
             if 'selected_protocol_id' in st.session_state:
                 del st.session_state.selected_protocol_id
@@ -1712,7 +1711,7 @@ def show_protocols_page():
                     
                     with col2:
                         if st.button("詳細", key=f"protocol_detail_{row['id']}"):
-                            st.session_state.selected_protocol_id = row['id']
+                            st.session_state.selected_protocol_id = int(row['id'])  # ←int()を追加
                             navigate_to_page("protocol_detail")
                     
                     st.markdown('</div>', unsafe_allow_html=True)
@@ -1724,6 +1723,9 @@ def show_protocols_page():
 
 def show_protocol_detail_page():
     """CTプロトコル詳細ページ"""
+
+    st.write(f"Debug: selected_protocol_id = {st.session_state.get('selected_protocol_id', 'なし')}")
+
     if 'selected_protocol_id' not in st.session_state:
         st.error("プロトコルが選択されていません")
         if st.button("プロトコル一覧に戻る", key="protocol_detail_back_no_selection"):
@@ -1792,9 +1794,11 @@ def show_protocol_detail_page():
             st.warning("削除ボタンをもう一度押すと削除されます")
     
     if st.button("⬅️ 戻る", key="protocol_detail_back"):
-        if 'selected_protocol_id' in st.session_state:
-            del st.session_state.selected_protocol_id
-        go_back()
+    # キャッシュクリアしてから画面遷移
+        if 'protocol_search_results' in st.session_state:
+            del st.session_state.protocol_search_results
+        navigate_to_page("protocols")
+    # selected_protocol_idは削除しない（navigate_to_page内で適切に処理される）
 
 def show_create_protocol_page():
     """CTプロトコル作成ページ"""
@@ -2053,6 +2057,7 @@ def show_sidebar():
             
             if 'page_history' in st.session_state and len(st.session_state.page_history) > 1:
                 if st.button("⬅️ 戻る", use_container_width=True, key="sidebar_back"):
+                    current_page = st.session_state.get('page', 'home')
                     go_back()
                     st.rerun()
                 st.markdown("---")
