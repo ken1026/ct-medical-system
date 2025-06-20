@@ -166,9 +166,17 @@ def go_back():
 
 def navigate_to_page(page):
     """ページナビゲーション（履歴付き）"""
-    add_to_page_history(st.session_state.get('page', 'home'))
+    # 現在のページを履歴に追加
+    current_page = st.session_state.get('page', 'home')
+    add_to_page_history(current_page)
+    
+    # 新しいページに移動
     st.session_state.page = page
-    st.query_params['page'] = page  
+    
+    # URLパラメータを即座に更新
+    st.query_params = {'page': page}
+    
+    # 画面を再読み込み
     st.rerun()
 
 # カスタムCSS
@@ -2565,89 +2573,45 @@ def get_custom_css():
     </style>
     """
 
-# メイン処理
 def main():
     """メイン関数"""
-    # JavaScript でブラウザ履歴同期（最優先で実行）
-    st.markdown("""
-    <script>
-    // URLパラメータ変更を監視（ブラウザの戻る/進むボタン対応）
-    window.addEventListener('popstate', function(event) {
-        console.log('Browser navigation detected, reloading...');
-        // ページリロードを強制実行
-        setTimeout(function() {
-            window.location.reload();
-        }, 100);
-    });
-    
-    // URL変更を検知してStreamlitに通知
-    function syncUrlWithStreamlit() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlPage = urlParams.get('page') || 'home';
-        
-        // Streamlitのクエリパラメータを強制更新
-        if (window.parent && window.parent.postMessage) {
-            window.parent.postMessage({
-                type: 'streamlit:setQueryParams',
-                queryParams: {page: urlPage}
-            }, '*');
-        }
-    }
-    
-    // 定期的にURL同期をチェック（1秒間隔）
-    setInterval(syncUrlWithStreamlit, 1000);
-    
-    // 初回実行
-    syncUrlWithStreamlit();
-    
-    console.log('Browser sync JavaScript loaded');
-    </script>
-    """, unsafe_allow_html=True)
-    
-    # セッション状態の初期化（エラーハンドリング付き）
+    # セッション状態の初期化
     if not initialize_session():
         st.error("アプリケーションの初期化に失敗しました")
         return
     
-    # URL同期処理を最優先で実行
-    try:
-        query_params = st.query_params
-        if 'page' in query_params:
-            url_page = query_params['page']
-            # URLのページを即座にセッションに反映
-            st.session_state.page = url_page
-            
-            # ページ遷移時の選択状態をクリア
-            if url_page == "search":
-                if 'selected_sick_id' in st.session_state:
-                    del st.session_state.selected_sick_id
-                if 'edit_sick_id' in st.session_state:
-                    del st.session_state.edit_sick_id
-            elif url_page == "notices":
-                if 'selected_notice_id' in st.session_state:
-                    del st.session_state.selected_notice_id
-                if 'edit_notice_id' in st.session_state:
-                    del st.session_state.edit_notice_id
-            elif url_page == "protocols":
-                if 'selected_protocol_id' in st.session_state:
-                    del st.session_state.selected_protocol_id
-                if 'edit_protocol_id' in st.session_state:
-                    del st.session_state.edit_protocol_id
-            
-            # ページ履歴を適切に管理
-            if 'page_history' not in st.session_state:
-                st.session_state.page_history = []
-            
-            # 現在のページを履歴に追加（重複を避けて）
-            if not st.session_state.page_history or st.session_state.page_history[-1] != url_page:
-                st.session_state.page_history.append(url_page)
-        else:
-            # URLにpageパラメータがない場合はホームページに設定
-            st.session_state.page = 'home'
-            st.query_params = {'page': 'home'}
-    except Exception as e:
-        st.error(f"URL処理エラー: {str(e)}")
-        st.session_state.page = 'home'
+    # URL同期処理（強化版）
+    query_params = st.query_params
+    
+    # URLからページを取得
+    url_page = query_params.get('page', 'home')
+    current_page = st.session_state.get('page', 'home')
+    
+    # URLとセッションが異なる場合は強制同期
+    if url_page != current_page:
+        st.session_state.page = url_page
+        
+        # 選択状態をクリア
+        clear_states = {
+            "search": ['selected_sick_id', 'edit_sick_id'],
+            "notices": ['selected_notice_id', 'edit_notice_id'],
+            "protocols": ['selected_protocol_id', 'edit_protocol_id']
+        }
+        
+        if url_page in clear_states:
+            for state in clear_states[url_page]:
+                if state in st.session_state:
+                    del st.session_state[state]
+        
+        # ページ履歴を更新
+        if 'page_history' not in st.session_state:
+            st.session_state.page_history = []
+        
+        if not st.session_state.page_history or st.session_state.page_history[-1] != url_page:
+            st.session_state.page_history.append(url_page)
+        
+        # 即座に再実行
+        st.rerun()
     
     # ログイン状態チェック
     if not check_login():
@@ -2693,7 +2657,8 @@ def main():
         else:
             # 不明なページの場合はホームにリダイレクト
             st.session_state.page = 'home'
-            navigate_to_page('home')
+            st.query_params = {'page': 'home'}
+            st.rerun()
     except Exception as e:
         st.error(f"ページ表示エラー: {str(e)}")
         st.session_state.page = 'home'
