@@ -2281,8 +2281,8 @@ def show_sidebar():
             
             st.markdown("---")
             
-            if st.button("🚪 ログアウト", use_container_width=True):
-                # ログアウト時にセッション情報をクリア
+            if st.button("🚪 ログアウト", use_container_width=True, key="sidebar_logout"):
+    # ログアウト時にセッション情報をクリア
                 if 'user' in st.session_state:
                     user_id = st.session_state.user['id']
                     try:
@@ -2294,14 +2294,18 @@ def show_sidebar():
                         conn.close()
                     except:
                         pass
+                
+                # 全てのセッション状態をクリア
                 for key in list(st.session_state.keys()):
                     if key != 'db_initialized':  # DB初期化状態は保持
                         del st.session_state[key]
-                st.session_state.page = "welcome"
+                
+                # ログインページに遷移
+                st.session_state.page = "login"
                 st.query_params.clear()             
-                st.query_params['page'] = "welcome"
+                st.query_params['page'] = "login"
                 st.rerun()
-
+                
             # 管理者メニュー（管理者のみ表示）
             if is_admin_user():
                 st.markdown("---")
@@ -2479,14 +2483,9 @@ def initialize_session():
 
 def check_login():
     """ログイン状態をチェック"""
-    # 開発用：常にログイン済みとして扱う
+    # ユーザー情報が存在しない場合はログインが必要
     if 'user' not in st.session_state or st.session_state.user is None:
-        # デフォルトユーザーを設定
-        st.session_state.user = {
-            'id': 1,
-            'name': '管理者',
-            'email': 'admin@hospital.jp'
-        }
+        return False
     return True
 
 def get_custom_css():
@@ -2577,6 +2576,35 @@ def get_custom_css():
     </style>
     """
 
+def logout():
+    """ログアウト処理"""
+    # ユーザー情報をクリア
+    if 'user' in st.session_state:
+        del st.session_state.user
+    
+    # その他の状態もクリア
+    states_to_clear = [
+        'page', 'page_history', 'login_attempted',
+        'selected_sick_id', 'edit_sick_id',
+        'selected_notice_id', 'edit_notice_id',
+        'selected_protocol_id', 'edit_protocol_id',
+        'search_results', 'show_all_diseases', 'protocol_search_results'
+    ]
+    
+    for state in states_to_clear:
+        if state in st.session_state:
+            del st.session_state[state]
+    
+    # ログインページに戻す
+    st.session_state.page = 'login'
+    st.query_params.clear()
+    st.query_params["page"] = "login"
+    
+    # 画面をリロード
+    st.rerun()
+
+
+
 def main():
     """メイン関数 - JavaScript併用版"""
     
@@ -2636,11 +2664,14 @@ def main():
     st.markdown(get_custom_css(), unsafe_allow_html=True)
     show_sidebar()
     
-    # ページルーティング
     current_page = st.session_state.get('page', 'home')
-    
+
     try:
-        if current_page == 'home':
+        if current_page == 'login':
+            show_login_page()
+        elif current_page == 'welcome':
+            show_welcome_page()
+        elif current_page == 'home':
             show_home_page()
         elif current_page == 'search':
             show_search_page()
@@ -2667,16 +2698,17 @@ def main():
         elif current_page == 'edit_protocol':
             show_edit_protocol_page()
         else:
-            st.session_state.page = 'home'
+            # 不明なページの場合はログインページにリダイレクト
+            st.session_state.page = 'login'
             st.query_params.clear()
-            st.query_params["page"] = "home"
+            st.query_params["page"] = "login"
             st.rerun()
             
     except Exception as e:
         st.error(f"ページ表示エラー: {str(e)}")
-        st.session_state.page = 'home'
+        st.session_state.page = 'login'
         st.query_params.clear()
-        st.query_params["page"] = "home"
+        st.query_params["page"] = "login"
         st.rerun()
 
 
