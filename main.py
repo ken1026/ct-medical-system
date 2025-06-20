@@ -2439,6 +2439,132 @@ def show_admin_page():
         else:
             st.info("登録ユーザーがいません")
 
+def initialize_session():
+    """セッション状態の初期化"""
+    try:
+        # ページ状態の初期化
+        if 'page' not in st.session_state:
+            st.session_state.page = 'home'
+        
+        # ページ履歴の初期化
+        if 'page_history' not in st.session_state:
+            st.session_state.page_history = ['home']
+        
+        # ユーザー情報の初期化
+        if 'user' not in st.session_state:
+            st.session_state.user = None
+        
+        # ログイン状態の初期化
+        if 'login_attempted' not in st.session_state:
+            st.session_state.login_attempted = False
+            
+    except Exception as e:
+        # エラーが発生した場合のフォールバック
+        st.error(f"セッション初期化エラー: {str(e)}")
+        return False
+    
+    return True
+
+def check_login():
+    """ログイン状態をチェック"""
+    # 開発用：常にログイン済みとして扱う
+    if 'user' not in st.session_state or st.session_state.user is None:
+        # デフォルトユーザーを設定
+        st.session_state.user = {
+            'id': 1,
+            'name': '管理者',
+            'email': 'admin@hospital.jp'
+        }
+    return True
+
+def get_custom_css():
+    """カスタムCSS取得"""
+    return """
+    <style>
+        .main-header {
+            background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            color: white;
+            text-align: center;
+        }
+        .disease-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            background-color: #f8f9fa;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .protocol-section {
+            background-color: #e3f2fd;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 0.5rem 0;
+            border-left: 4px solid #2196F3;
+        }
+        .contrast-section {
+            background-color: #f3e5f5;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 0.5rem 0;
+            border-left: 4px solid #9c27b0;
+        }
+        .processing-section {
+            background-color: #e8f5e8;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 0.5rem 0;
+            border-left: 4px solid #4caf50;
+        }
+        .disease-section {
+            background-color: #fff3e0;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 0.5rem 0;
+            border-left: 4px solid #ff9800;
+        }
+        .notice-card {
+            border-left: 4px solid #2196F3;
+            padding: 1rem;
+            margin: 1rem 0;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 5px;
+        }
+        .search-result {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            background-color: #fafafa;
+        }
+        .welcome-title {
+            font-size: 4rem;
+            font-weight: bold;
+            color: #1e88e5;
+            text-align: center;
+            margin: 3rem 0;
+        }
+        .section-title {
+            color: #1565c0;
+            border-bottom: 2px solid #1565c0;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .rich-editor-hint {
+            background-color: #e8f5e8;
+            border: 1px solid #4caf50;
+            border-radius: 5px;
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            font-size: 0.9rem;
+            color: #2e7d32;
+        }
+    </style>
+    """
+
 # メイン処理
 def main():
     """メイン関数"""
