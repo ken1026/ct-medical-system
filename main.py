@@ -2584,38 +2584,29 @@ def main():
         st.error("アプリケーションの初期化に失敗しました")
         return
     
-    # URL同期処理（強化版）
+    # URL同期処理（強制同期版）
     query_params = st.query_params
-    
-    # URLからページを取得
     url_page = query_params.get('page', 'home')
-    current_page = st.session_state.get('page', 'home')
     
-    # URLとセッションが異なる場合は強制同期
-    if url_page != current_page:
-        st.session_state.page = url_page
-        
-        # 選択状態をクリア
-        clear_states = {
-            "search": ['selected_sick_id', 'edit_sick_id'],
-            "notices": ['selected_notice_id', 'edit_notice_id'],
-            "protocols": ['selected_protocol_id', 'edit_protocol_id']
-        }
-        
-        if url_page in clear_states:
-            for state in clear_states[url_page]:
-                if state in st.session_state:
-                    del st.session_state[state]
-        
-        # ページ履歴を更新
-        if 'page_history' not in st.session_state:
-            st.session_state.page_history = []
-        
-        if not st.session_state.page_history or st.session_state.page_history[-1] != url_page:
-            st.session_state.page_history.append(url_page)
-        
-        # 即座に再実行
-        st.rerun()
+    # URLのページを無条件でセッションに設定
+    st.session_state.page = url_page
+    
+    # ページ変更時の状態クリア
+    if url_page == "search":
+        if 'selected_sick_id' in st.session_state:
+            del st.session_state.selected_sick_id
+        if 'edit_sick_id' in st.session_state:
+            del st.session_state.edit_sick_id
+    elif url_page == "notices":
+        if 'selected_notice_id' in st.session_state:
+            del st.session_state.selected_notice_id
+        if 'edit_notice_id' in st.session_state:
+            del st.session_state.edit_notice_id
+    elif url_page == "protocols":
+        if 'selected_protocol_id' in st.session_state:
+            del st.session_state.selected_protocol_id
+        if 'edit_protocol_id' in st.session_state:
+            del st.session_state.edit_protocol_id
     
     # ログイン状態チェック
     if not check_login():
@@ -2628,8 +2619,8 @@ def main():
     # サイドバー表示
     show_sidebar()
     
-    # ページルーティング
-    page = st.session_state.get('page', 'home')
+    # ページルーティング（URLのページを直接使用）
+    page = url_page
     
     try:
         if page == 'home':
@@ -2660,13 +2651,12 @@ def main():
             show_edit_protocol_page()
         else:
             # 不明なページの場合はホームにリダイレクト
-            st.session_state.page = 'home'
-            st.query_params = {'page': 'home'}
+            st.query_params.update({"page": "home"})
             st.rerun()
     except Exception as e:
         st.error(f"ページ表示エラー: {str(e)}")
-        st.session_state.page = 'home'
-        show_home_page()
+        st.query_params.update({"page": "home"})
+        st.rerun()
 
 if __name__ == "__main__":
     main()
