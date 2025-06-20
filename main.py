@@ -2441,79 +2441,137 @@ def show_admin_page():
 
 # メイン処理
 def main():
-    """メイン処理"""
-    # 初回のみデータベース初期化
-    if 'db_initialized' not in st.session_state:
-        init_connection()
-        try:
-            init_database()
-            insert_sample_data()
-            st.session_state.db_initialized = True
-        except Exception as e:
-            st.error(f"データベース初期化エラー: {e}")
+    """メイン関数"""
+    # JavaScript でブラウザ履歴同期（最優先で実行）
+    st.markdown("""
+    <script>
+    // URLパラメータ変更を監視（ブラウザの戻る/進むボタン対応）
+    window.addEventListener('popstate', function(event) {
+        console.log('Browser navigation detected, reloading...');
+        // ページリロードを強制実行
+        setTimeout(function() {
+            window.location.reload();
+        }, 100);
+    });
     
-    # セッション状態の復元
-    if 'user' not in st.session_state:
-        try:
-            session_data = load_session_from_db()
-            if session_data:
-                st.session_state.user = session_data['user']
-                st.session_state.page = session_data['page']
-        except:
-            pass
+    // URL変更を検知してStreamlitに通知
+    function syncUrlWithStreamlit() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlPage = urlParams.get('page') || 'home';
+        
+        // Streamlitのクエリパラメータを強制更新
+        if (window.parent && window.parent.postMessage) {
+            window.parent.postMessage({
+                type: 'streamlit:setQueryParams',
+                queryParams: {page: urlPage}
+            }, '*');
+        }
+    }
     
-    # ページ状態の初期化
-    if 'page' not in st.session_state:
-        st.session_state.page = "welcome"
+    // 定期的にURL同期をチェック（1秒間隔）
+    setInterval(syncUrlWithStreamlit, 1000);
     
-    # ログイン状態による分岐
-    if 'user' not in st.session_state:
-        # ログインしていない場合
-        if st.session_state.page == "welcome":
-            show_welcome_page()
-        elif st.session_state.page == "login":
-            show_login_page()
+    // 初回実行
+    syncUrlWithStreamlit();
+    
+    console.log('Browser sync JavaScript loaded');
+    </script>
+    """, unsafe_allow_html=True)
+    
+    # セッション状態の初期化（エラーハンドリング付き）
+    if not initialize_session():
+        st.error("アプリケーションの初期化に失敗しました")
+        return
+    
+    # URL同期処理を最優先で実行
+    try:
+        query_params = st.query_params
+        if 'page' in query_params:
+            url_page = query_params['page']
+            # URLのページを即座にセッションに反映
+            st.session_state.page = url_page
+            
+            # ページ遷移時の選択状態をクリア
+            if url_page == "search":
+                if 'selected_sick_id' in st.session_state:
+                    del st.session_state.selected_sick_id
+                if 'edit_sick_id' in st.session_state:
+                    del st.session_state.edit_sick_id
+            elif url_page == "notices":
+                if 'selected_notice_id' in st.session_state:
+                    del st.session_state.selected_notice_id
+                if 'edit_notice_id' in st.session_state:
+                    del st.session_state.edit_notice_id
+            elif url_page == "protocols":
+                if 'selected_protocol_id' in st.session_state:
+                    del st.session_state.selected_protocol_id
+                if 'edit_protocol_id' in st.session_state:
+                    del st.session_state.edit_protocol_id
+            
+            # ページ履歴を適切に管理
+            if 'page_history' not in st.session_state:
+                st.session_state.page_history = []
+            
+            # 現在のページを履歴に追加（重複を避けて）
+            if not st.session_state.page_history or st.session_state.page_history[-1] != url_page:
+                st.session_state.page_history.append(url_page)
         else:
-            st.session_state.page = "welcome"
-            show_welcome_page()
-    else:
-        # ログイン済みの場合
-        if st.session_state.page == "welcome":
-            st.session_state.page = "home"
-        
-        show_sidebar()
-        
-        # メインコンテンツ表示
-        if st.session_state.page == "home":
+            # URLにpageパラメータがない場合はホームページに設定
+            st.session_state.page = 'home'
+            st.query_params = {'page': 'home'}
+    except Exception as e:
+        st.error(f"URL処理エラー: {str(e)}")
+        st.session_state.page = 'home'
+    
+    # ログイン状態チェック
+    if not check_login():
+        show_login_page()
+        return
+    
+    # CSS スタイル設定
+    st.markdown(get_custom_css(), unsafe_allow_html=True)
+    
+    # サイドバー表示
+    show_sidebar()
+    
+    # ページルーティング
+    page = st.session_state.get('page', 'home')
+    
+    try:
+        if page == 'home':
             show_home_page()
-        elif st.session_state.page == "search":
+        elif page == 'search':
             show_search_page()
-        elif st.session_state.page == "detail":
+        elif page == 'detail':
             show_detail_page()
-        elif st.session_state.page == "notices":
-            show_notices_page()
-        elif st.session_state.page == "notice_detail":
-            show_notice_detail_page()
-        elif st.session_state.page == "create_disease":
+        elif page == 'create_disease':
             show_create_disease_page()
-        elif st.session_state.page == "create_notice":
-            show_create_notice_page()
-        elif st.session_state.page == "edit_notice":
-            show_edit_notice_page()
-        elif st.session_state.page == "edit_disease":
+        elif page == 'edit_disease':
             show_edit_disease_page()
-        elif st.session_state.page == "protocols":
+        elif page == 'notices':
+            show_notices_page()
+        elif page == 'notice_detail':
+            show_notice_detail_page()
+        elif page == 'create_notice':
+            show_create_notice_page()
+        elif page == 'edit_notice':
+            show_edit_notice_page()
+        elif page == 'protocols':
             show_protocols_page()
-        elif st.session_state.page == "protocol_detail":
+        elif page == 'protocol_detail':
             show_protocol_detail_page()
-        elif st.session_state.page == "create_protocol":
+        elif page == 'create_protocol':
             show_create_protocol_page()
-        elif st.session_state.page == "edit_protocol":
+        elif page == 'edit_protocol':
             show_edit_protocol_page()
-        elif st.session_state.page == "admin":
-            show_admin_page()
         else:
-            show_home_page()
+            # 不明なページの場合はホームにリダイレクト
+            st.session_state.page = 'home'
+            navigate_to_page('home')
+    except Exception as e:
+        st.error(f"ページ表示エラー: {str(e)}")
+        st.session_state.page = 'home'
+        show_home_page()
 
 if __name__ == "__main__":
     main()
