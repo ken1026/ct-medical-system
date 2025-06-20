@@ -3112,7 +3112,52 @@ def logout():
     # 画面をリロード
     st.rerun()
 
+def initialize_session():
+    """セッション初期化"""
+    if 'db_initialized' not in st.session_state:
+        init_database()
+        insert_sample_data()
+        st.session_state.db_initialized = True
+    return True
 
+def check_login():
+    """ログイン状態チェック"""
+    if 'user' not in st.session_state:
+        return False
+    return True
+
+def get_custom_css():
+    """カスタムCSS取得"""
+    return ""  # 既存のCSSを返すか、空文字でもOK
+
+# ============================================
+# 不足している2つの関数のみ - main()関数の直前に追加してください
+# ============================================
+
+def clear_page_states(page):
+    """ページ遷移時に不要な状態をクリア"""
+    clear_states = {
+        "search": ['selected_sick_id', 'edit_sick_id'],
+        "notices": ['selected_notice_id', 'edit_notice_id'], 
+        "protocols": ['selected_protocol_id', 'edit_protocol_id']
+    }
+    
+    if page in clear_states:
+        for state in clear_states[page]:
+            if state in st.session_state:
+                del st.session_state[state]
+
+def navigate_to_page(page):
+    """ページナビゲーション - 確実版"""
+    # セッション状態を更新
+    st.session_state.page = page
+    
+    # URLを更新（複数の方法で確実に）
+    st.query_params.clear()
+    st.query_params["page"] = page
+    
+    # 強制再読み込み
+    st.rerun()
 
 def main():
     """メイン関数 - JavaScript併用版"""
