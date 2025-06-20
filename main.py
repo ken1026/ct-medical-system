@@ -104,15 +104,19 @@ def load_session_from_db():
         return None
 
 def get_user_by_id(user_id):
-    """IDでユーザー情報を取得"""
+    """IDでユーザー情報を取得 - PostgreSQL版"""
     try:
         conn = get_db_connection()
+        if not conn:
+            return None
+        
         cursor = conn.cursor()
         cursor.execute("SELECT id, name, email FROM users WHERE id = %s", (user_id,))
         user = cursor.fetchone()
         conn.close()
         return user
-    except:
+    except Exception as e:
+        st.error(f"ユーザー取得エラー: {e}")
         return None
 
 def update_session_in_db():
@@ -598,44 +602,42 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def authenticate_user(email, password):
-    """ユーザー認証"""
-    conn = get_db_connection()
-    if not conn:
-        return None
-    
+    """ユーザー認証 - PostgreSQL版"""
     try:
+        conn = get_db_connection()
+        if not conn:
+            return None
+        
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name, email FROM users WHERE email = %s AND password = %s", 
-                       (email, hash_password(password)))
+        cursor.execute(
+            "SELECT id, name, email FROM users WHERE email = %s AND password = %s", 
+            (email, hash_password(password))
+        )
         user = cursor.fetchone()
+        conn.close()
         return user
     except Exception as e:
         st.error(f"認証エラー: {e}")
         return None
-    finally:
-        if conn:
-            cursor.close()
-            conn.close()
 
 def register_user(name, email, password):
-    """新規ユーザー登録"""
-    conn = get_db_connection()
-    if not conn:
-        return False
-    
+    """新規ユーザー登録 - PostgreSQL版"""
     try:
+        conn = get_db_connection()
+        if not conn:
+            return False
+        
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
-                      (name, email, hash_password(password)))
+        cursor.execute(
+            "INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
+            (name, email, hash_password(password))
+        )
         conn.commit()
+        conn.close()
         return True
     except Exception as e:
         st.error(f"ユーザー登録エラー: {e}")
         return False
-    finally:
-        if conn:
-            cursor.close()
-            conn.close()
 
 # データベース操作関数
 @st.cache_data(ttl=300)  # 5分間キャッシュ
@@ -856,23 +858,59 @@ def validate_email(email):
     return True, "OK"
 
 def get_all_users():
-    """全ユーザー情報を取得（管理者用）"""
-    conn = get_db_connection()
-    df = pd.read_sql_query("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC", conn)
-    conn.close()
-    return df
+    """全ユーザー情報を取得（管理者用）- PostgreSQL版"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return pd.DataFrame()
+        
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC")
+        users = cursor.fetchall()
+        
+        # DataFrameに変換
+        df = pd.DataFrame(users, columns=['id', 'name', 'email', 'created_at'])
+        
+        conn.close()
+        return df
+    except Exception as e:
+        st.error(f"ユーザー取得エラー: {e}")
+        return pd.DataFrame()
 
 def delete_user(user_id):
-    """ユーザーを削除（管理者用）"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM users WHERE id = %s', (user_id,))
-    conn.commit()
-    conn.close()
+    """ユーザーを削除（管理者用）- PostgreSQL版"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return False
+        
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM users WHERE id = %s', (user_id,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        st.error(f"ユーザー削除エラー: {e}")
+        return False
 
 def admin_register_user(name, email, password):
-    """管理者による新規ユーザー登録"""
-    return register_user(name, email, password)  # 既存の関数を再利用
+    """管理者による新規ユーザー登録 - PostgreSQL版"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return False
+        
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
+            (name, email, hash_password(password))
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        st.error(f"ユーザー登録エラー: {e}")
+        return False
 
 # ページ関数定義
 def show_welcome_page():
@@ -2327,9 +2365,358 @@ def show_sidebar():
             st.markdown("`pip install streamlit-quill`")
             st.markdown("でインストールしてください")
 
+
+def export_all_data():
+    """全データをJSONでエクスポート（PostgreSQL版）"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return None, "PostgreSQL接続に失敗しました"
+        
+        cursor = conn.cursor()
+        
+        data = {
+            'export_info': {
+                'export_date': datetime.now().isoformat(),
+                'version': '2.0',
+                'app_name': 'How to CT Medical System',
+                'database_type': 'PostgreSQL'
+            },
+            'users': [],
+            'sicks': [],
+            'forms': [],
+            'protocols': []
+        }
+        
+        # ユーザーデータ（SQLiteから取得）
+        try:
+            sqlite_conn = sqlite3.connect('medical_ct.db')
+            sqlite_cursor = sqlite_conn.cursor()
+            sqlite_cursor.execute("SELECT id, name, email, created_at, updated_at FROM users")
+            users = sqlite_cursor.fetchall()
+            for user in users:
+                data['users'].append({
+                    'id': user[0], 'name': user[1], 'email': user[2],
+                    'created_at': str(user[3]) if user[3] else '',
+                    'updated_at': str(user[4]) if user[4] else ''
+                })
+            sqlite_conn.close()
+        except Exception as e:
+            st.warning(f"ユーザーデータの取得に失敗: {str(e)}")
+        
+        # 疾患データ（PostgreSQLから取得）
+        cursor.execute("SELECT * FROM sicks ORDER BY id")
+        sicks = cursor.fetchall()
+        for sick in sicks:
+            data['sicks'].append({
+                'id': sick[0], 'diesease': sick[1], 'diesease_text': sick[2],
+                'keyword': sick[3], 'protocol': sick[4], 'protocol_text': sick[5],
+                'processing': sick[6], 'processing_text': sick[7],
+                'contrast': sick[8], 'contrast_text': sick[9],
+                'diesease_img': sick[10], 'protocol_img': sick[11],
+                'processing_img': sick[12], 'contrast_img': sick[13],
+                'created_at': str(sick[14]) if len(sick) > 14 and sick[14] else '',
+                'updated_at': str(sick[15]) if len(sick) > 15 and sick[15] else ''
+            })
+        
+        # お知らせデータ（PostgreSQLから取得）
+        cursor.execute("SELECT * FROM forms ORDER BY id")
+        forms = cursor.fetchall()
+        for form in forms:
+            data['forms'].append({
+                'id': form[0], 'title': form[1], 'main': form[2],
+                'post_img': form[3],
+                'created_at': str(form[4]) if len(form) > 4 and form[4] else '',
+                'updated_at': str(form[5]) if len(form) > 5 and form[5] else ''
+            })
+        
+        # プロトコルデータ（PostgreSQLから取得）
+        cursor.execute("SELECT * FROM protocols ORDER BY id")
+        protocols = cursor.fetchall()
+        for protocol in protocols:
+            data['protocols'].append({
+                'id': protocol[0], 'category': protocol[1], 'title': protocol[2],
+                'content': protocol[3], 'protocol_img': protocol[4],
+                'created_at': str(protocol[5]) if len(protocol) > 5 and protocol[5] else '',
+                'updated_at': str(protocol[6]) if len(protocol) > 6 and protocol[6] else ''
+            })
+        
+        conn.close()
+        return data, "OK"
+        
+    except Exception as e:
+        return None, f"データエクスポート中にエラー: {str(e)}"
+
+def create_backup_zip():
+    """バックアップZIPファイルを作成"""
+    try:
+        # データをエクスポート
+        data, error = export_all_data()
+        if not data:
+            return None, error
+        
+        # ZIPファイルをメモリ上で作成
+        zip_buffer = BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # JSONデータを追加
+            json_data = json.dumps(data, ensure_ascii=False, indent=2)
+            zip_file.writestr('backup_data.json', json_data)
+            
+            # README.txtを追加
+            readme_content = f"""How to CT Medical System - Backup File
+==================================================
+
+作成日時: {datetime.now().strftime('%Y年%m月%d日 %H時%M分%S秒')}
+バージョン: 2.0
+データベース: PostgreSQL + SQLite (ハイブリッド)
+
+含まれるデータ:
+- 疾患データ: {len(data['sicks'])}件
+- お知らせ: {len(data['forms'])}件  
+- CTプロトコル: {len(data['protocols'])}件
+- ユーザー情報: {len(data['users'])}件 (パスワード除く)
+
+復元方法:
+1. 管理者ページの「データ管理」タブを開く
+2. 「データ復元」セクションでこのZIPファイルをアップロード
+3. 「データを復元」ボタンをクリック
+
+注意: 復元時は既存データに追加されます。重複する場合は上書きされる可能性があります。
+"""
+            zip_file.writestr('README.txt', readme_content)
+        
+        zip_buffer.seek(0)
+        return zip_buffer.getvalue(), None
+        
+    except Exception as e:
+        return None, f"バックアップZIP作成中にエラー: {str(e)}"
+
+def restore_from_json(json_data):
+    """JSONデータから復元（PostgreSQL版）"""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return False, "PostgreSQL接続に失敗しました"
+        
+        cursor = conn.cursor()
+        restored_counts = {'sicks': 0, 'forms': 0, 'protocols': 0}
+        
+        # 疾患データ復元
+        if 'sicks' in json_data:
+            for sick in json_data['sicks']:
+                try:
+                    cursor.execute('''
+                        INSERT INTO sicks (
+                            diesease, diesease_text, keyword, protocol, protocol_text,
+                            processing, processing_text, contrast, contrast_text,
+                            diesease_img, protocol_img, processing_img, contrast_img
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (diesease) DO UPDATE SET
+                            diesease_text = EXCLUDED.diesease_text,
+                            keyword = EXCLUDED.keyword,
+                            protocol = EXCLUDED.protocol,
+                            protocol_text = EXCLUDED.protocol_text,
+                            processing = EXCLUDED.processing,
+                            processing_text = EXCLUDED.processing_text,
+                            contrast = EXCLUDED.contrast,
+                            contrast_text = EXCLUDED.contrast_text,
+                            diesease_img = EXCLUDED.diesease_img,
+                            protocol_img = EXCLUDED.protocol_img,
+                            processing_img = EXCLUDED.processing_img,
+                            contrast_img = EXCLUDED.contrast_img,
+                            updated_at = CURRENT_TIMESTAMP
+                    ''', (
+                        sick.get('diesease', ''),
+                        sick.get('diesease_text', ''),
+                        sick.get('keyword', ''),
+                        sick.get('protocol', ''),
+                        sick.get('protocol_text', ''),
+                        sick.get('processing', ''),
+                        sick.get('processing_text', ''),
+                        sick.get('contrast', ''),
+                        sick.get('contrast_text', ''),
+                        sick.get('diesease_img', ''),
+                        sick.get('protocol_img', ''),
+                        sick.get('processing_img', ''),
+                        sick.get('contrast_img', '')
+                    ))
+                    restored_counts['sicks'] += 1
+                except Exception as e:
+                    st.warning(f"疾患データスキップ: {sick.get('diesease', 'Unknown')} - {str(e)}")
+        
+        # お知らせデータ復元
+        if 'forms' in json_data:
+            for form in json_data['forms']:
+                try:
+                    cursor.execute('''
+                        INSERT INTO forms (title, main, post_img)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (title) DO UPDATE SET
+                            main = EXCLUDED.main,
+                            post_img = EXCLUDED.post_img,
+                            updated_at = CURRENT_TIMESTAMP
+                    ''', (
+                        form.get('title', ''),
+                        form.get('main', ''),
+                        form.get('post_img', '')
+                    ))
+                    restored_counts['forms'] += 1
+                except Exception as e:
+                    st.warning(f"お知らせデータスキップ: {form.get('title', 'Unknown')} - {str(e)}")
+        
+        # プロトコルデータ復元
+        if 'protocols' in json_data:
+            for protocol in json_data['protocols']:
+                try:
+                    cursor.execute('''
+                        INSERT INTO protocols (category, title, content, protocol_img)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (title) DO UPDATE SET
+                            category = EXCLUDED.category,
+                            content = EXCLUDED.content,
+                            protocol_img = EXCLUDED.protocol_img,
+                            updated_at = CURRENT_TIMESTAMP
+                    ''', (
+                        protocol.get('category', ''),
+                        protocol.get('title', ''),
+                        protocol.get('content', ''),
+                        protocol.get('protocol_img', '')
+                    ))
+                    restored_counts['protocols'] += 1
+                except Exception as e:
+                    st.warning(f"プロトコルデータスキップ: {protocol.get('title', 'Unknown')} - {str(e)}")
+        
+        # コミット
+        conn.commit()
+        conn.close()
+        
+        # キャッシュクリア
+        if 'all_sicks_data' in st.session_state:
+            del st.session_state['all_sicks_data']
+        if 'all_forms_data' in st.session_state:
+            del st.session_state['all_forms_data']
+        if 'all_protocols_data' in st.session_state:
+            del st.session_state['all_protocols_data']
+        
+        return True, restored_counts
+        
+    except Exception as e:
+        return False, f"データ復元中にエラー: {str(e)}"
+
+def import_sqlite_data(sqlite_file_path):
+    """SQLite（Laravel版）からPostgreSQLにデータを移行（画像データ除外版）"""
+    try:
+        # SQLite接続
+        sqlite_conn = sqlite3.connect(sqlite_file_path)
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        # PostgreSQL接続
+        pg_conn = get_db_connection()
+        if not pg_conn:
+            return False, "PostgreSQL接続に失敗しました"
+        
+        pg_cursor = pg_conn.cursor()
+        
+        imported_counts = {'sicks': 0, 'forms': 0, 'protocols': 0}
+        
+        # 疾患データ移行（画像データ除外）
+        try:
+            sqlite_cursor.execute("SELECT * FROM sicks")
+            sicks = sqlite_cursor.fetchall()
+            
+            for sick in sicks:
+                try:
+                    pg_cursor.execute('''
+                        INSERT INTO sicks (
+                            diesease, diesease_text, keyword, protocol, protocol_text,
+                            processing, processing_text, contrast, contrast_text
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (diesease) DO UPDATE SET
+                            diesease_text = EXCLUDED.diesease_text,
+                            keyword = EXCLUDED.keyword,
+                            protocol = EXCLUDED.protocol,
+                            protocol_text = EXCLUDED.protocol_text,
+                            processing = EXCLUDED.processing,
+                            processing_text = EXCLUDED.processing_text,
+                            contrast = EXCLUDED.contrast,
+                            contrast_text = EXCLUDED.contrast_text,
+                            updated_at = CURRENT_TIMESTAMP
+                    ''', (
+                        sick[1], sick[2], sick[3], sick[4], sick[5],
+                        sick[6], sick[7], sick[8], sick[9]
+                        # 画像データ（sick[10], sick[11], sick[12], sick[13]）は除外
+                    ))
+                    imported_counts['sicks'] += 1
+                except Exception as e:
+                    st.warning(f"疾患データスキップ: {sick[1]} - {str(e)}")
+        except Exception as e:
+            st.warning(f"疾患テーブルが見つかりません: {str(e)}")
+        
+        # お知らせデータ移行（画像データ除外）
+        try:
+            sqlite_cursor.execute("SELECT * FROM forms")
+            forms = sqlite_cursor.fetchall()
+            
+            for form in forms:
+                try:
+                    pg_cursor.execute('''
+                        INSERT INTO forms (title, main)
+                        VALUES (%s, %s)
+                        ON CONFLICT (title) DO UPDATE SET
+                            main = EXCLUDED.main,
+                            updated_at = CURRENT_TIMESTAMP
+                    ''', (form[1], form[2]))
+                    # 画像データ（form[3]）は除外
+                    imported_counts['forms'] += 1
+                except Exception as e:
+                    st.warning(f"お知らせデータスキップ: {form[1]} - {str(e)}")
+        except Exception as e:
+            st.warning(f"お知らせテーブルが見つかりません: {str(e)}")
+        
+        # プロトコルデータ移行（画像データ除外）
+        try:
+            sqlite_cursor.execute("SELECT * FROM protocols")
+            protocols = sqlite_cursor.fetchall()
+            
+            for protocol in protocols:
+                try:
+                    pg_cursor.execute('''
+                        INSERT INTO protocols (category, title, content)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (title) DO UPDATE SET
+                            category = EXCLUDED.category,
+                            content = EXCLUDED.content,
+                            updated_at = CURRENT_TIMESTAMP
+                    ''', (protocol[1], protocol[2], protocol[3]))
+                    # 画像データ（protocol[4]）は除外
+                    imported_counts['protocols'] += 1
+                except Exception as e:
+                    st.warning(f"プロトコルデータスキップ: {protocol[2]} - {str(e)}")
+        except Exception as e:
+            st.warning(f"プロトコルテーブルが見つかりません: {str(e)}")
+        
+        # コミットして接続クローズ
+        pg_conn.commit()
+        sqlite_conn.close()
+        pg_conn.close()
+        
+        # キャッシュクリア
+        if 'all_sicks_data' in st.session_state:
+            del st.session_state['all_sicks_data']
+        if 'all_forms_data' in st.session_state:
+            del st.session_state['all_forms_data']
+        if 'all_protocols_data' in st.session_state:
+            del st.session_state['all_protocols_data']
+        
+        return True, imported_counts
+        
+    except Exception as e:
+        return False, f"データ移行中にエラー: {str(e)}"
+
 # 管理者ページ（簡略版）
 def show_admin_page():
-    """管理者専用ページ"""
+    """管理者専用ページ（完全版）"""
     if not is_admin_user():
         st.error("🚫 管理者権限が必要です")
         return
@@ -2337,17 +2724,17 @@ def show_admin_page():
     st.markdown('<div class="main-header"><h1>管理者専用ページ</h1></div>', unsafe_allow_html=True)
     st.markdown(f"**管理者:** {st.session_state.user['name']} ({st.session_state.user['email']})")
     
-    # タブで機能を分ける
-    tab1, tab2 = st.tabs(["新規ユーザー作成", "ユーザー管理"])
+    # タブで機能を分ける（3つに変更）
+    tab1, tab2, tab3 = st.tabs(["新規ユーザー作成", "ユーザー管理", "データ管理"])
     
     with tab1:
-        st.markdown("### 新規ユーザー作成")
+        st.markdown("### 👤 新規ユーザー作成")
         
         with st.form("admin_register_form"):
             st.info("管理者のみが新しいユーザーアカウントを作成できます")
             
             name = st.text_input("氏名 *", placeholder="例：山田太郎")
-            email = st.text_input("メールアドレス *", placeholder="例：yamada@hospital.com")
+            email = st.text_input("メールアドレス *", placeholder="例：yamada@hospital.jp")
             password = st.text_input("初期パスワード *", type="password", placeholder="8文字以上推奨")
             password_confirm = st.text_input("パスワード確認 *", type="password")
             
@@ -2375,7 +2762,7 @@ def show_admin_page():
                     email_valid, email_error = validate_email(email)
                     if not email_valid:
                         st.error(f"❌ {email_error}")
-                        st.info("💡 正しい形式の例: yamada@hospital.com")
+                        st.info("💡 正しい形式の例: yamada@hospital.jp")
                     elif password == password_confirm:
                         if len(password) >= 6:  # パスワード長チェック
                             if admin_register_user(name, email, password):
@@ -2406,7 +2793,7 @@ def show_admin_page():
                     st.error("❌ 全ての必須項目を入力してください")
     
     with tab2:
-        st.markdown("### ユーザー管理")
+        st.markdown("### 👥 ユーザー管理")
         
         # 全ユーザー一覧表示
         df_users = get_all_users()
@@ -2454,127 +2841,249 @@ def show_admin_page():
                 st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.info("登録ユーザーがいません")
-
-def initialize_session():
-    """セッション状態の初期化"""
-    try:
-        # ページ状態の初期化
-        if 'page' not in st.session_state:
-            st.session_state.page = 'home'
         
-        # ページ履歴の初期化
-        if 'page_history' not in st.session_state:
-            st.session_state.page_history = ['home']
-        
-        # ユーザー情報の初期化
-        if 'user' not in st.session_state:
-            st.session_state.user = None
-        
-        # ログイン状態の初期化
-        if 'login_attempted' not in st.session_state:
-            st.session_state.login_attempted = False
+        # ユーザー統計情報
+        if not df_users.empty:
+            st.markdown("---")
+            st.markdown("### 📊 ユーザー統計")
             
-    except Exception as e:
-        # エラーが発生した場合のフォールバック
-        st.error(f"セッション初期化エラー: {str(e)}")
-        return False
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("総ユーザー数", len(df_users))
+            with col2:
+                # 今月の新規登録数
+                current_month = datetime.now().strftime('%Y-%m')
+                monthly_users = len([u for u in df_users['created_at'] if current_month in str(u)])
+                st.metric("今月の新規登録", f"{monthly_users}人")
+            with col3:
+                # 管理者数
+                admin_count = len([u for u in df_users['email'] if u in ['admin@hospital.jp']])
+                st.metric("管理者数", f"{admin_count}人")
     
-    return True
-
-def check_login():
-    """ログイン状態をチェック"""
-    # ユーザー情報が存在しない場合はログインが必要
-    if 'user' not in st.session_state or st.session_state.user is None:
-        return False
-    return True
-
-def get_custom_css():
-    """カスタムCSS取得"""
-    return """
-    <style>
-        .main-header {
-            background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
-            padding: 2rem;
-            border-radius: 10px;
-            margin-bottom: 2rem;
-            color: white;
-            text-align: center;
-        }
-        .disease-card {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin: 1rem 0;
-            background-color: #f8f9fa;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .protocol-section {
-            background-color: #e3f2fd;
-            padding: 1rem;
-            border-radius: 5px;
-            margin: 0.5rem 0;
-            border-left: 4px solid #2196F3;
-        }
-        .contrast-section {
-            background-color: #f3e5f5;
-            padding: 1rem;
-            border-radius: 5px;
-            margin: 0.5rem 0;
-            border-left: 4px solid #9c27b0;
-        }
-        .processing-section {
-            background-color: #e8f5e8;
-            padding: 1rem;
-            border-radius: 5px;
-            margin: 0.5rem 0;
-            border-left: 4px solid #4caf50;
-        }
-        .disease-section {
-            background-color: #fff3e0;
-            padding: 1rem;
-            border-radius: 5px;
-            margin: 0.5rem 0;
-            border-left: 4px solid #ff9800;
-        }
-        .notice-card {
-            border-left: 4px solid #2196F3;
-            padding: 1rem;
-            margin: 1rem 0;
-            background-color: #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            border-radius: 5px;
-        }
-        .search-result {
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 0.5rem 0;
-            background-color: #fafafa;
-        }
-        .welcome-title {
-            font-size: 4rem;
-            font-weight: bold;
-            color: #1e88e5;
-            text-align: center;
-            margin: 3rem 0;
-        }
-        .section-title {
-            color: #1565c0;
-            border-bottom: 2px solid #1565c0;
-            padding-bottom: 0.5rem;
-            margin-bottom: 1rem;
-        }
-        .rich-editor-hint {
-            background-color: #e8f5e8;
-            border: 1px solid #4caf50;
-            border-radius: 5px;
-            padding: 0.5rem;
-            margin: 0.5rem 0;
-            font-size: 0.9rem;
-            color: #2e7d32;
-        }
-    </style>
-    """
+    with tab3:
+        st.markdown("### 📊 データ管理")
+        
+        # データエクスポート
+        st.markdown("#### 📤 データバックアップ")
+        
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.info("""
+            **バックアップに含まれるデータ:**
+            - 疾患データ（画像含む）
+            - お知らせ（画像含む）
+            - CTプロトコル（画像含む）
+            - ユーザー情報（パスワード除く）
+            """)
+        
+        with col2:
+            if st.button("📤 バックアップ作成", use_container_width=True, key="create_backup"):
+                with st.spinner("バックアップを作成中..."):
+                    backup_data, error = create_backup_zip()
+                    
+                    if backup_data:
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        filename = f"ct_system_backup_{timestamp}.zip"
+                        
+                        st.download_button(
+                            label="📥 バックアップをダウンロード",
+                            data=backup_data,
+                            file_name=filename,
+                            mime="application/zip",
+                            use_container_width=True
+                        )
+                        st.success("✅ バックアップが作成されました！")
+                    else:
+                        st.error(f"❌ {error}")
+        
+        st.markdown("---")
+        
+        # データ復元
+        st.markdown("#### 📥 データ復元")
+        
+        uploaded_file = st.file_uploader(
+            "バックアップファイルを選択",
+            type=['json', 'zip'],
+            help="backup_data.json または バックアップZIPファイルをアップロード",
+            key="backup_file_uploader"
+        )
+        
+        if uploaded_file is not None:
+            file_type = uploaded_file.name.split('.')[-1].lower()
+            
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                st.warning("""
+                ⚠️ **復元時の注意事項:**
+                - 既存のデータと重複する場合は上書きされます
+                - 復元前に現在のデータをバックアップすることを推奨します
+                - ユーザーデータは復元されません（手動で再作成が必要）
+                """)
+            
+            with col2:
+                if st.button("📥 データを復元", use_container_width=True, key="restore_data"):
+                    try:
+                        if file_type == 'json':
+                            # JSONファイルから直接復元
+                            json_content = uploaded_file.read().decode('utf-8')
+                            json_data = json.loads(json_content)
+                            
+                        elif file_type == 'zip':
+                            # ZIPファイルから復元
+                            with zipfile.ZipFile(uploaded_file, 'r') as zip_file:
+                                json_content = zip_file.read('backup_data.json').decode('utf-8')
+                                json_data = json.loads(json_content)
+                        
+                        # 復元実行
+                        with st.spinner("データを復元中..."):
+                            success, result = restore_from_json(json_data)
+                            
+                            if success:
+                                st.success("🎉 データの復元が完了しました！")
+                                st.info(f"""
+                                **📊 復元結果:**
+                                - 疾患データ: {result['sicks']}件
+                                - お知らせ: {result['forms']}件
+                                - CTプロトコル: {result['protocols']}件
+                                """)
+                                st.balloons()
+                            else:
+                                st.error(f"❌ {result}")
+                    
+                    except Exception as e:
+                        st.error(f"❌ ファイルの処理中にエラーが発生しました: {str(e)}")
+        
+        st.markdown("---")
+        
+        # SQLiteデータ取り込み
+        st.markdown("#### 📂 Laravel版SQLiteデータ取り込み")
+        
+        sqlite_uploaded_file = st.file_uploader(
+            "Laravel版SQLiteファイルを選択",
+            type=['db', 'sqlite', 'sqlite3'],
+            help="Laravel版で使用していたSQLiteデータベースファイルをアップロード",
+            key="sqlite_import_uploader"
+        )
+        
+        if sqlite_uploaded_file is not None:
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                st.info("""
+                **Laravel版SQLiteデータ取り込み:**
+                - 既存のPostgreSQLデータに追加されます
+                - 重複データがある場合はスキップされます
+                - 疾患、お知らせ、CTプロトコルデータが対象です
+                """)
+            
+            with col2:
+                if st.button("📂 SQLiteデータを取り込み", use_container_width=True, key="import_sqlite"):
+                    with st.spinner("SQLiteデータを取り込み中..."):
+                        try:
+                            # 一時ファイルに保存
+                            import tempfile
+                            import os
+                            with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as tmp_file:
+                                tmp_file.write(sqlite_uploaded_file.read())
+                                tmp_file_path = tmp_file.name
+                            
+                            # データ移行実行
+                            success, result = import_sqlite_data(tmp_file_path)
+                            
+                            # 一時ファイル削除
+                            os.unlink(tmp_file_path)
+                            
+                            if success:
+                                st.success("🎉 SQLiteデータの取り込みが完了しました！")
+                                st.info(f"""
+                                **📊 取り込み結果:**
+                                - 疾患データ: {result['sicks']}件
+                                - お知らせ: {result['forms']}件
+                                - CTプロトコル: {result['protocols']}件
+                                """)
+                                st.balloons()
+                            else:
+                                st.error(f"❌ {result}")
+                        
+                        except Exception as e:
+                            st.error(f"❌ ファイル処理中にエラー: {str(e)}")
+        
+        st.markdown("---")
+        
+        # システム情報
+        st.markdown("#### ℹ️ システム情報")
+        
+        try:
+            # PostgreSQLからデータベース統計を取得
+            conn = get_db_connection()
+            if conn:
+                cursor = conn.cursor()
+                
+                cursor.execute("SELECT COUNT(*) FROM sicks")
+                sick_count = cursor.fetchone()[0]
+                
+                cursor.execute("SELECT COUNT(*) FROM forms")
+                form_count = cursor.fetchone()[0]
+                
+                cursor.execute("SELECT COUNT(*) FROM protocols")
+                protocol_count = cursor.fetchone()[0]
+                
+                cursor.execute("SELECT COUNT(*) FROM users")
+                user_count = cursor.fetchone()[0]
+                
+                conn.close()
+                
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("疾患データ", f"{sick_count}件")
+                with col2:
+                    st.metric("お知らせ", f"{form_count}件")
+                with col3:
+                    st.metric("CTプロトコル", f"{protocol_count}件")
+                with col4:
+                    st.metric("ユーザー", f"{user_count}人")
+            else:
+                st.error("データベース接続に失敗しました")
+                
+        except Exception as e:
+            st.error(f"システム情報の取得に失敗しました: {str(e)}")
+        
+        st.caption("💡 定期的なバックアップを推奨します（週1回以上）")
+        
+        st.markdown("---")
+        
+        # データクリア（危険な操作）
+        st.markdown("#### 🗑️ データクリア（危険）")
+        st.error("⚠️ **危険な操作**: 全てのデータ（疾患、お知らせ、CTプロトコル）が完全に削除されます")
+        
+        if st.checkbox("データクリアを実行することを理解しました", key="confirm_clear_data"):
+            if st.button("🗑️ 全データを削除", key="clear_all_data"):
+                if st.session_state.get('final_confirm_clear', False):
+                    with st.spinner("データを削除中..."):
+                        try:
+                            conn = get_db_connection()
+                            if conn:
+                                cursor = conn.cursor()
+                                
+                                # PostgreSQLデータを削除
+                                cursor.execute("DELETE FROM sicks")
+                                cursor.execute("DELETE FROM forms") 
+                                cursor.execute("DELETE FROM protocols")
+                                
+                                conn.commit()
+                                conn.close()
+                                
+                                st.success("✅ 全データを削除しました")
+                                if 'final_confirm_clear' in st.session_state:
+                                    del st.session_state.final_confirm_clear
+                            else:
+                                st.error("❌ データベース接続に失敗しました")
+                        except Exception as e:
+                            st.error(f"❌ データ削除に失敗しました: {str(e)}")
+                else:
+                    st.session_state.final_confirm_clear = True
+                    st.warning("⚠️ もう一度ボタンを押すと完全に削除されます")
 
 def logout():
     """ログアウト処理"""
