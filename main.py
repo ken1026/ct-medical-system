@@ -2305,7 +2305,7 @@ def show_sidebar():
                 st.query_params.clear()             
                 st.query_params['page'] = "login"
                 st.rerun()
-                
+
             # 管理者メニュー（管理者のみ表示）
             if is_admin_user():
                 st.markdown("---")
@@ -2697,18 +2697,21 @@ def main():
             show_create_protocol_page()
         elif current_page == 'edit_protocol':
             show_edit_protocol_page()
+        elif current_page == 'admin':  # ← この行を追加
+            show_admin_page()
         else:
-            # 不明なページの場合はログインページにリダイレクト
-            st.session_state.page = 'login'
+            # 不明なページの場合はホームページにリダイレクト（loginからhomeに変更）
+            st.session_state.page = 'home'
             st.query_params.clear()
-            st.query_params["page"] = "login"
+            st.query_params["page"] = "home"
             st.rerun()
             
     except Exception as e:
         st.error(f"ページ表示エラー: {str(e)}")
-        st.session_state.page = 'login'
+        # エラー時もホームページにリダイレクト（loginからhomeに変更）
+        st.session_state.page = 'home'
         st.query_params.clear()
-        st.query_params["page"] = "login"
+        st.query_params["page"] = "home"
         st.rerun()
 
 
