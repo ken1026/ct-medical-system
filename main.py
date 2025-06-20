@@ -2578,85 +2578,134 @@ def get_custom_css():
     """
 
 def main():
-    """メイン関数"""
+    """メイン関数 - JavaScript併用版"""
+    
+    # JavaScript でブラウザイベントを監視
+    st.markdown("""
+    <script>
+    // ページが読み込まれたときに実行
+    window.addEventListener('load', function() {
+        console.log('Page loaded, current URL:', window.location.search);
+    });
+    
+    // ブラウザの戻る/進むボタンを検知
+    window.addEventListener('popstate', function(event) {
+        console.log('Browser navigation detected');
+        console.log('Current URL:', window.location.search);
+        
+        // Streamlitに強制リロードを要求
+        setTimeout(function() {
+            window.location.reload();
+        }, 50);
+    });
+    
+    // URLパラメータの変化を監視
+    let lastUrl = window.location.search;
+    setInterval(function() {
+        if (window.location.search !== lastUrl) {
+            console.log('URL changed from', lastUrl, 'to', window.location.search);
+            lastUrl = window.location.search;
+            // ページを強制リロード
+            window.location.reload();
+        }
+    }, 500); // 0.5秒間隔で監視
+    </script>
+    """, unsafe_allow_html=True)
+    
     # セッション状態の初期化
     if not initialize_session():
         st.error("アプリケーションの初期化に失敗しました")
         return
     
-    # URL同期処理（強制同期版）
+    # URL同期処理
     query_params = st.query_params
     url_page = query_params.get('page', 'home')
     
-    # URLのページを無条件でセッションに設定
+    # URLページを強制的にセッションに設定
     st.session_state.page = url_page
     
     # ページ変更時の状態クリア
-    if url_page == "search":
-        if 'selected_sick_id' in st.session_state:
-            del st.session_state.selected_sick_id
-        if 'edit_sick_id' in st.session_state:
-            del st.session_state.edit_sick_id
-    elif url_page == "notices":
-        if 'selected_notice_id' in st.session_state:
-            del st.session_state.selected_notice_id
-        if 'edit_notice_id' in st.session_state:
-            del st.session_state.edit_notice_id
-    elif url_page == "protocols":
-        if 'selected_protocol_id' in st.session_state:
-            del st.session_state.selected_protocol_id
-        if 'edit_protocol_id' in st.session_state:
-            del st.session_state.edit_protocol_id
+    clear_page_states(url_page)
     
-    # ログイン状態チェック
+    # ログイン処理
     if not check_login():
         show_login_page()
         return
     
-    # CSS スタイル設定
+    # UI表示
     st.markdown(get_custom_css(), unsafe_allow_html=True)
-    
-    # サイドバー表示
     show_sidebar()
     
-    # ページルーティング（URLのページを直接使用）
-    page = url_page
+    # ページルーティング
+    current_page = st.session_state.get('page', 'home')
     
     try:
-        if page == 'home':
+        if current_page == 'home':
             show_home_page()
-        elif page == 'search':
+        elif current_page == 'search':
             show_search_page()
-        elif page == 'detail':
+        elif current_page == 'detail':
             show_detail_page()
-        elif page == 'create_disease':
+        elif current_page == 'create_disease':
             show_create_disease_page()
-        elif page == 'edit_disease':
+        elif current_page == 'edit_disease':
             show_edit_disease_page()
-        elif page == 'notices':
+        elif current_page == 'notices':
             show_notices_page()
-        elif page == 'notice_detail':
+        elif current_page == 'notice_detail':
             show_notice_detail_page()
-        elif page == 'create_notice':
+        elif current_page == 'create_notice':
             show_create_notice_page()
-        elif page == 'edit_notice':
+        elif current_page == 'edit_notice':
             show_edit_notice_page()
-        elif page == 'protocols':
+        elif current_page == 'protocols':
             show_protocols_page()
-        elif page == 'protocol_detail':
+        elif current_page == 'protocol_detail':
             show_protocol_detail_page()
-        elif page == 'create_protocol':
+        elif current_page == 'create_protocol':
             show_create_protocol_page()
-        elif page == 'edit_protocol':
+        elif current_page == 'edit_protocol':
             show_edit_protocol_page()
         else:
-            # 不明なページの場合はホームにリダイレクト
-            st.query_params.update({"page": "home"})
+            st.session_state.page = 'home'
+            st.query_params.clear()
+            st.query_params["page"] = "home"
             st.rerun()
+            
     except Exception as e:
         st.error(f"ページ表示エラー: {str(e)}")
-        st.query_params.update({"page": "home"})
+        st.session_state.page = 'home'
+        st.query_params.clear()
+        st.query_params["page"] = "home"
         st.rerun()
+
+
+def clear_page_states(page):
+    """ページ遷移時に不要な状態をクリア"""
+    clear_states = {
+        "search": ['selected_sick_id', 'edit_sick_id'],
+        "notices": ['selected_notice_id', 'edit_notice_id'], 
+        "protocols": ['selected_protocol_id', 'edit_protocol_id']
+    }
+    
+    if page in clear_states:
+        for state in clear_states[page]:
+            if state in st.session_state:
+                del st.session_state[state]
+
+
+def navigate_to_page(page):
+    """ページナビゲーション - 確実版"""
+    # セッション状態を更新
+    st.session_state.page = page
+    
+    # URLを更新（複数の方法で確実に）
+    st.query_params.clear()
+    st.query_params["page"] = page
+    
+    # 強制再読み込み
+    st.rerun()
+
 
 if __name__ == "__main__":
     main()
