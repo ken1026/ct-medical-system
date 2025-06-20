@@ -2605,7 +2605,7 @@ def restore_from_json(json_data):
         return False, f"データ復元中にエラー: {str(e)}"
 
 def import_sqlite_data(sqlite_file_path):
-    """SQLite（Laravel版）からPostgreSQLにデータを移行（画像データ除外版）"""
+    """SQLite（Laravel版）からPostgreSQLにデータを移行（修正版）"""
     try:
         # SQLite接続
         sqlite_conn = sqlite3.connect(sqlite_file_path)
@@ -2620,94 +2620,158 @@ def import_sqlite_data(sqlite_file_path):
         
         imported_counts = {'sicks': 0, 'forms': 0, 'protocols': 0}
         
-        # 疾患データ移行（画像データ除外）
+        # まず、PostgreSQLテーブルにUNIQUE制約を追加
         try:
+            # 疾患テーブルにUNIQUE制約を追加（既存の場合はスキップ）
+            pg_cursor.execute('''
+                ALTER TABLE sicks ADD CONSTRAINT unique_diesease UNIQUE (diesease)
+            ''')
+            st.write("✅ 疾患テーブルにUNIQUE制約を追加しました")
+        except Exception as e:
+            if "already exists" in str(e) or "unique_diesease" in str(e):
+                st.write("ℹ️ 疾患テーブルのUNIQUE制約は既に存在します")
+            else:
+                st.warning(f"疾患テーブルUNIQUE制約追加エラー: {e}")
+        
+        try:
+            # お知らせテーブルにUNIQUE制約を追加
+            pg_cursor.execute('''
+                ALTER TABLE forms ADD CONSTRAINT unique_title UNIQUE (title)
+            ''')
+            st.write("✅ お知らせテーブルにUNIQUE制約を追加しました")
+        except Exception as e:
+            if "already exists" in str(e) or "unique_title" in str(e):
+                st.write("ℹ️ お知らせテーブルのUNIQUE制約は既に存在します")
+            else:
+                st.warning(f"お知らせテーブルUNIQUE制約追加エラー: {e}")
+        
+        # コミットして制約を有効化
+        pg_conn.commit()
+        
+        # 疾患データ移行（画像データ除外、重複チェック改良版）
+        try:
+            sqlite_cursor.execute("SELECT COUNT(*) FROM sicks")
+            sick_count = sqlite_cursor.fetchone()[0]
+            st.write(f"📊 SQLite疾患データ件数: {sick_count}件")
+            
             sqlite_cursor.execute("SELECT * FROM sicks")
             sicks = sqlite_cursor.fetchall()
             
             for sick in sicks:
                 try:
+                    # まず重複チェック
+                    pg_cursor.execute("SELECT COUNT(*) FROM sicks WHERE diesease = %s", (sick[1],))
+                    exists = pg_cursor.fetchone()[0] > 0
+                    
+                    if exists:
+                        st.write(f"⚠️ 疾患データ重複スキップ: {sick[1]}")
+                        continue
+                    
+                    # 新規挿入
                     pg_cursor.execute('''
                         INSERT INTO sicks (
                             diesease, diesease_text, keyword, protocol, protocol_text,
                             processing, processing_text, contrast, contrast_text
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (diesease) DO UPDATE SET
-                            diesease_text = EXCLUDED.diesease_text,
-                            keyword = EXCLUDED.keyword,
-                            protocol = EXCLUDED.protocol,
-                            protocol_text = EXCLUDED.protocol_text,
-                            processing = EXCLUDED.processing,
-                            processing_text = EXCLUDED.processing_text,
-                            contrast = EXCLUDED.contrast,
-                            contrast_text = EXCLUDED.contrast_text,
-                            updated_at = CURRENT_TIMESTAMP
                     ''', (
-                        sick[1], sick[2], sick[3], sick[4], sick[5],
-                        sick[6], sick[7], sick[8], sick[9]
-                        # 画像データ（sick[10], sick[11], sick[12], sick[13]）は除外
+                        sick[1], sick[2], sick[3] or '', sick[4] or '', sick[5] or '',
+                        sick[6] or '', sick[7] or '', sick[8] or '', sick[9] or ''
                     ))
                     imported_counts['sicks'] += 1
+                    st.write(f"✅ 疾患データ登録: {sick[1]}")
+                    
                 except Exception as e:
-                    st.warning(f"疾患データスキップ: {sick[1]} - {str(e)}")
+                    st.warning(f"❌ 疾患データエラー: {sick[1]} - {str(e)}")
+                    # エラーが発生してもロールバックせず継続
+                    pg_conn.rollback()
+                    continue
         except Exception as e:
-            st.warning(f"疾患テーブルが見つかりません: {str(e)}")
+            st.warning(f"疾患テーブル処理エラー: {str(e)}")
         
-        # お知らせデータ移行（画像データ除外）
+        # お知らせデータ移行（画像データ除外、重複チェック改良版）
         try:
+            sqlite_cursor.execute("SELECT COUNT(*) FROM forms")
+            form_count = sqlite_cursor.fetchone()[0]
+            st.write(f"📊 SQLiteお知らせ件数: {form_count}件")
+            
             sqlite_cursor.execute("SELECT * FROM forms")
             forms = sqlite_cursor.fetchall()
             
             for form in forms:
                 try:
+                    # タイトルが空の場合は作成日時をタイトルにする
+                    title = form[1] if form[1] else f"お知らせ_{form[4]}"
+                    
+                    # まず重複チェック
+                    pg_cursor.execute("SELECT COUNT(*) FROM forms WHERE title = %s", (title,))
+                    exists = pg_cursor.fetchone()[0] > 0
+                    
+                    if exists:
+                        st.write(f"⚠️ お知らせ重複スキップ: {title}")
+                        continue
+                    
+                    # 新規挿入
                     pg_cursor.execute('''
-                        INSERT INTO forms (title, main)
-                        VALUES (%s, %s)
-                        ON CONFLICT (title) DO UPDATE SET
-                            main = EXCLUDED.main,
-                            updated_at = CURRENT_TIMESTAMP
-                    ''', (form[1], form[2]))
-                    # 画像データ（form[3]）は除外
+                        INSERT INTO forms (title, main) VALUES (%s, %s)
+                    ''', (title, form[2] or ''))
                     imported_counts['forms'] += 1
+                    st.write(f"✅ お知らせ登録: {title}")
+                    
                 except Exception as e:
-                    st.warning(f"お知らせデータスキップ: {form[1]} - {str(e)}")
+                    st.warning(f"❌ お知らせエラー: {title} - {str(e)}")
+                    pg_conn.rollback()
+                    continue
         except Exception as e:
-            st.warning(f"お知らせテーブルが見つかりません: {str(e)}")
+            st.warning(f"お知らせテーブル処理エラー: {str(e)}")
         
-        # プロトコルデータ移行（画像データ除外）
+        # プロトコルデータ移行（テーブル存在チェック）
         try:
-            sqlite_cursor.execute("SELECT * FROM protocols")
-            protocols = sqlite_cursor.fetchall()
+            sqlite_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='protocols'")
+            protocol_table_exists = sqlite_cursor.fetchone() is not None
             
-            for protocol in protocols:
-                try:
-                    pg_cursor.execute('''
-                        INSERT INTO protocols (category, title, content)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (title) DO UPDATE SET
-                            category = EXCLUDED.category,
-                            content = EXCLUDED.content,
-                            updated_at = CURRENT_TIMESTAMP
-                    ''', (protocol[1], protocol[2], protocol[3]))
-                    # 画像データ（protocol[4]）は除外
-                    imported_counts['protocols'] += 1
-                except Exception as e:
-                    st.warning(f"プロトコルデータスキップ: {protocol[2]} - {str(e)}")
+            if protocol_table_exists:
+                sqlite_cursor.execute("SELECT COUNT(*) FROM protocols")
+                protocol_count = sqlite_cursor.fetchone()[0]
+                st.write(f"📊 SQLiteプロトコル件数: {protocol_count}件")
+                
+                sqlite_cursor.execute("SELECT * FROM protocols")
+                protocols = sqlite_cursor.fetchall()
+                
+                for protocol in protocols:
+                    try:
+                        # まず重複チェック
+                        pg_cursor.execute("SELECT COUNT(*) FROM protocols WHERE title = %s", (protocol[2],))
+                        exists = pg_cursor.fetchone()[0] > 0
+                        
+                        if exists:
+                            st.write(f"⚠️ プロトコル重複スキップ: {protocol[2]}")
+                            continue
+                        
+                        # 新規挿入
+                        pg_cursor.execute('''
+                            INSERT INTO protocols (category, title, content) VALUES (%s, %s, %s)
+                        ''', (protocol[1] or '一般', protocol[2], protocol[3] or ''))
+                        imported_counts['protocols'] += 1
+                        st.write(f"✅ プロトコル登録: {protocol[2]}")
+                        
+                    except Exception as e:
+                        st.warning(f"❌ プロトコルエラー: {protocol[2]} - {str(e)}")
+                        pg_conn.rollback()
+                        continue
+            else:
+                st.info("ℹ️ Laravel版SQLiteにプロトコルテーブルは存在しません")
         except Exception as e:
-            st.warning(f"プロトコルテーブルが見つかりません: {str(e)}")
+            st.warning(f"プロトコルテーブル処理エラー: {str(e)}")
         
-        # コミットして接続クローズ
+        # 最終コミット
         pg_conn.commit()
         sqlite_conn.close()
         pg_conn.close()
         
         # キャッシュクリア
-        if 'all_sicks_data' in st.session_state:
-            del st.session_state['all_sicks_data']
-        if 'all_forms_data' in st.session_state:
-            del st.session_state['all_forms_data']
-        if 'all_protocols_data' in st.session_state:
-            del st.session_state['all_protocols_data']
+        get_all_sicks.clear()
+        get_all_forms.clear()
+        get_all_protocols.clear()
         
         return True, imported_counts
         
