@@ -165,18 +165,22 @@ def go_back():
         st.session_state.page = "home"
 
 def navigate_to_page(page):
-    """ページナビゲーション（履歴付き）"""
+    """ページナビゲーション（デバッグ版）"""
+    st.write(f"Debug: Navigating to {page}")  # デバッグ用
+    
     # 現在のページを履歴に追加
     current_page = st.session_state.get('page', 'home')
     add_to_page_history(current_page)
     
-    # 新しいページに移動
+    # セッション状態を更新
     st.session_state.page = page
+    st.write(f"Debug: Session page set to {st.session_state.page}")  # デバッグ用
     
-    # URLパラメータを即座に更新
-    st.query_params = {'page': page}
+    # URLパラメータを更新
+    st.query_params.update({"page": page})
+    st.write(f"Debug: URL params set to {dict(st.query_params)}")  # デバッグ用
     
-    # 画面を再読み込み
+    # 強制再読み込み
     st.rerun()
 
 # カスタムCSS
