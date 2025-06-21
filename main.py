@@ -2605,11 +2605,31 @@ def restore_from_json(json_data):
         return False, f"データ復元中にエラー: {str(e)}"
 
 def import_sqlite_data(sqlite_file_path):
-    """SQLite（Laravel版）からPostgreSQLにデータを移行（修正版）"""
+    """SQLite（Laravel版）からPostgreSQLにデータを移行（お知らせ修正版）"""
     try:
         # SQLite接続
         sqlite_conn = sqlite3.connect(sqlite_file_path)
         sqlite_cursor = sqlite_conn.cursor()
+        
+        # デバッグ: formsテーブルの構造を確認
+        st.write("🔍 formsテーブルの構造確認:")
+        try:
+            sqlite_cursor.execute("PRAGMA table_info(forms)")
+            columns = sqlite_cursor.fetchall()
+            for col in columns:
+                st.write(f"- {col[1]} ({col[2]})")
+        except Exception as e:
+            st.warning(f"テーブル構造確認エラー: {e}")
+        
+        # サンプルデータを確認
+        st.write("📋 formsテーブルのサンプルデータ:")
+        try:
+            sqlite_cursor.execute("SELECT * FROM forms LIMIT 3")
+            samples = sqlite_cursor.fetchall()
+            for i, sample in enumerate(samples):
+                st.write(f"Row {i+1}: {sample}")
+        except Exception as e:
+            st.warning(f"サンプルデータ確認エラー: {e}")
         
         # PostgreSQL接続
         pg_conn = get_db_connection()
@@ -2688,7 +2708,7 @@ def import_sqlite_data(sqlite_file_path):
         except Exception as e:
             st.warning(f"疾患テーブル処理エラー: {str(e)}")
         
-        # お知らせデータ移行（画像データ除外、重複チェック改良版）
+        # お知らせデータ移行（修正版）
         try:
             sqlite_cursor.execute("SELECT COUNT(*) FROM forms")
             form_count = sqlite_cursor.fetchone()[0]
@@ -2699,8 +2719,41 @@ def import_sqlite_data(sqlite_file_path):
             
             for form in forms:
                 try:
-                    # タイトルが空の場合は作成日時をタイトルにする
-                    title = form[1] if form[1] else f"お知らせ_{form[4]}"
+                    # formsテーブルの構造を動的に判定
+                    # 日付フィールドを判定して適切な列を選択
+                    form_data = list(form)
+                    
+                    # 可能なタイトルと本文の組み合わせを試す
+                    title = None
+                    main_content = None
+                    
+                    # パターン1: 通常のテーブル構造 (id, title, main, created_at, updated_at)
+                    if len(form_data) >= 3:
+                        # form[1]が日付でない場合はタイトルとして使用
+                        if form_data[1] and not (isinstance(form_data[1], str) and 
+                                               ('-' in form_data[1] and ':' in form_data[1])):
+                            title = str(form_data[1])
+                            main_content = str(form_data[2]) if form_data[2] else ""
+                        # form[2]をタイトルとして試す
+                        elif form_data[2] and not (isinstance(form_data[2], str) and 
+                                                  ('-' in form_data[2] and ':' in form_data[2])):
+                            title = str(form_data[2])
+                            main_content = str(form_data[3]) if len(form_data) > 3 and form_data[3] else ""
+                        else:
+                            # すべて日付の場合は作成日時をタイトルに
+                            if len(form_data) > 4:
+                                title = f"お知らせ {form_data[4]}" if form_data[4] else f"お知らせ {form_data[0]}"
+                            else:
+                                title = f"お知らせ {form_data[0]}"
+                            main_content = "内容が設定されていません"
+                    
+                    # タイトルの最終確認
+                    if not title:
+                        title = f"お知らせ_{form_data[0]}"
+                    
+                    # タイトルの長さ制限
+                    if len(title) > 100:
+                        title = title[:97] + "..."
                     
                     # まず重複チェック
                     pg_cursor.execute("SELECT COUNT(*) FROM forms WHERE title = %s", (title,))
@@ -2713,12 +2766,12 @@ def import_sqlite_data(sqlite_file_path):
                     # 新規挿入
                     pg_cursor.execute('''
                         INSERT INTO forms (title, main) VALUES (%s, %s)
-                    ''', (title, form[2] or ''))
+                    ''', (title, main_content))
                     imported_counts['forms'] += 1
                     st.write(f"✅ お知らせ登録: {title}")
                     
                 except Exception as e:
-                    st.warning(f"❌ お知らせエラー: {title} - {str(e)}")
+                    st.warning(f"❌ お知らせエラー: {title if 'title' in locals() else 'Unknown'} - {str(e)}")
                     pg_conn.rollback()
                     continue
         except Exception as e:
