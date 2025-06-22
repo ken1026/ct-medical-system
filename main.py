@@ -2700,8 +2700,8 @@ def import_sqlite_data(sqlite_file_path):
                             st.write(f"  🗑️ 日付データ除去 ({field_name}): {value_str}")
                             return ""
                         
-                        # 非常に短い意味のない文字列の場合も除去
-                        if len(value_str) < 3:
+                        # 非常に短い意味のない文字列の場合も除去（ただし1文字以上は保持）
+                        if len(value_str) < 1:
                             return ""
                         
                         return value_str
@@ -2717,10 +2717,16 @@ def import_sqlite_data(sqlite_file_path):
                     contrast = clean_field(sick[8], "造影プロトコル")
                     contrast_text = clean_field(sick[9], "造影詳細")
                     
-                    # デバッグ: 処理結果を表示
+                    # デバッグ: 処理結果を表示（全フィールド）
                     st.write(f"📋 処理結果 - {diesease}:")
+                    st.write(f"  - 疾患詳細: '{diesease_text[:50]}...' ({len(diesease_text)}文字)")
+                    st.write(f"  - キーワード: '{keyword}'")
+                    st.write(f"  - 撮影プロトコル: '{protocol}'")
+                    st.write(f"  - 撮影詳細: '{protocol_text[:50]}...' ({len(protocol_text)}文字)")
                     st.write(f"  - 画像処理: '{processing}'")
-                    st.write(f"  - 画像処理詳細: '{processing_text}'")
+                    st.write(f"  - 画像処理詳細: '{processing_text[:50]}...' ({len(processing_text)}文字)")
+                    st.write(f"  - 造影プロトコル: '{contrast}'")
+                    st.write(f"  - 造影詳細: '{contrast_text[:50]}...' ({len(contrast_text)}文字)")
                     
                     # 新規挿入
                     pg_cursor.execute('''
