@@ -1104,6 +1104,28 @@ def show_search_page():
 
 def show_detail_page():
     """疾患詳細ページ（修正版）"""
+    # ページトップにスクロール（詳細ページ専用）
+    st.markdown("""
+    <script>
+    // 即座にページトップへスクロール
+    window.scrollTo({top: 0, behavior: 'instant'});
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    
+    // 少し遅延してもう一度確実にスクロール
+    setTimeout(function() {
+        window.scrollTo({top: 0, behavior: 'smooth'});
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+    }, 50);
+    
+    // コンテンツ読み込み後にもう一度
+    setTimeout(function() {
+        window.scrollTo(0, 0);
+    }, 200);
+    </script>
+    """, unsafe_allow_html=True)
+    
     if 'selected_sick_id' not in st.session_state:
         st.error("疾患が選択されていません")
         if st.button("検索に戻る", key="detail_back_no_selection"):
