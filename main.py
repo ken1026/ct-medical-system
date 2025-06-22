@@ -2605,31 +2605,31 @@ def restore_from_json(json_data):
         return False, f"データ復元中にエラー: {str(e)}"
 
 def import_sqlite_data(sqlite_file_path):
-    """SQLite（Laravel版）からPostgreSQLにデータを移行（お知らせ修正版）"""
+    """SQLite（Laravel版）からPostgreSQLにデータを移行（完成版）"""
     try:
         # SQLite接続
         sqlite_conn = sqlite3.connect(sqlite_file_path)
         sqlite_cursor = sqlite_conn.cursor()
         
-        # デバッグ: formsテーブルの構造を確認
-        st.write("🔍 formsテーブルの構造確認:")
-        try:
-            sqlite_cursor.execute("PRAGMA table_info(forms)")
-            columns = sqlite_cursor.fetchall()
-            for col in columns:
-                st.write(f"- {col[1]} ({col[2]})")
-        except Exception as e:
-            st.warning(f"テーブル構造確認エラー: {e}")
+        # デバッグ: テーブル構造を確認
+        st.write("🔍 sicksテーブル構造確認:")
         
-        # サンプルデータを確認
-        st.write("📋 formsテーブルのサンプルデータ:")
+        # sicksテーブル構造確認のみ
         try:
-            sqlite_cursor.execute("SELECT * FROM forms LIMIT 3")
-            samples = sqlite_cursor.fetchall()
-            for i, sample in enumerate(samples):
-                st.write(f"Row {i+1}: {sample}")
+            sqlite_cursor.execute("PRAGMA table_info(sicks)")
+            sick_columns = sqlite_cursor.fetchall()
+            st.write("📋 sicksテーブル:")
+            for col in sick_columns:
+                st.write(f"  - {col[0]}: {col[1]} ({col[2]})")
+            
+            # sicksサンプルデータ
+            sqlite_cursor.execute("SELECT * FROM sicks LIMIT 1")
+            sick_samples = sqlite_cursor.fetchall()
+            st.write("📋 sicksサンプルデータ:")
+            for i, sample in enumerate(sick_samples):
+                st.write(f"  Row {i+1}: {sample}")
         except Exception as e:
-            st.warning(f"サンプルデータ確認エラー: {e}")
+            st.warning(f"sicksテーブル確認エラー: {e}")
         
         # PostgreSQL接続
         pg_conn = get_db_connection()
@@ -2640,9 +2640,8 @@ def import_sqlite_data(sqlite_file_path):
         
         imported_counts = {'sicks': 0, 'forms': 0, 'protocols': 0}
         
-        # まず、PostgreSQLテーブルにUNIQUE制約を追加
+        # UNIQUE制約を追加
         try:
-            # 疾患テーブルにUNIQUE制約を追加（既存の場合はスキップ）
             pg_cursor.execute('''
                 ALTER TABLE sicks ADD CONSTRAINT unique_diesease UNIQUE (diesease)
             ''')
@@ -2650,25 +2649,10 @@ def import_sqlite_data(sqlite_file_path):
         except Exception as e:
             if "already exists" in str(e) or "unique_diesease" in str(e):
                 st.write("ℹ️ 疾患テーブルのUNIQUE制約は既に存在します")
-            else:
-                st.warning(f"疾患テーブルUNIQUE制約追加エラー: {e}")
         
-        try:
-            # お知らせテーブルにUNIQUE制約を追加
-            pg_cursor.execute('''
-                ALTER TABLE forms ADD CONSTRAINT unique_title UNIQUE (title)
-            ''')
-            st.write("✅ お知らせテーブルにUNIQUE制約を追加しました")
-        except Exception as e:
-            if "already exists" in str(e) or "unique_title" in str(e):
-                st.write("ℹ️ お知らせテーブルのUNIQUE制約は既に存在します")
-            else:
-                st.warning(f"お知らせテーブルUNIQUE制約追加エラー: {e}")
-        
-        # コミットして制約を有効化
         pg_conn.commit()
         
-        # 疾患データ移行（画像データ除外、重複チェック改良版）
+        # 疾患データ移行（強化版）
         try:
             sqlite_cursor.execute("SELECT COUNT(*) FROM sicks")
             sick_count = sqlite_cursor.fetchone()[0]
@@ -2679,13 +2663,64 @@ def import_sqlite_data(sqlite_file_path):
             
             for sick in sicks:
                 try:
-                    # まず重複チェック
+                    # 重複チェック
                     pg_cursor.execute("SELECT COUNT(*) FROM sicks WHERE diesease = %s", (sick[1],))
                     exists = pg_cursor.fetchone()[0] > 0
                     
                     if exists:
                         st.write(f"⚠️ 疾患データ重複スキップ: {sick[1]}")
                         continue
+                    
+                    # 強化された日付検出関数
+                    def is_datetime_string(value):
+                        if not value:
+                            return False
+                        if isinstance(value, str):
+                            # より厳密な日付パターンをチェック
+                            datetime_patterns = [
+                                r'^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$',  # 2023-09-19 08:09:37
+                                r'^\d{4}-\d{2}-\d{2}[\s\d:.-]*$',  # その他の日付パターン
+                                r'^\d{4}/\d{2}/\d{2}',  # 2023/09/19形式
+                                r'^\d{2}:\d{2}:\d{2}$',  # 08:09:37のみ
+                            ]
+                            for pattern in datetime_patterns:
+                                if re.match(pattern, str(value).strip()):
+                                    return True
+                        return False
+                    
+                    # より詳細なフィールド処理
+                    def clean_field(value, field_name=""):
+                        if not value:
+                            return ""
+                        
+                        value_str = str(value).strip()
+                        
+                        # 日付文字列の場合は除去
+                        if is_datetime_string(value_str):
+                            st.write(f"  🗑️ 日付データ除去 ({field_name}): {value_str}")
+                            return ""
+                        
+                        # 非常に短い意味のない文字列の場合も除去
+                        if len(value_str) < 3:
+                            return ""
+                        
+                        return value_str
+                    
+                    # 各フィールドを適切に処理（フィールド名付きでログ出力）
+                    diesease = clean_field(sick[1], "疾患名")
+                    diesease_text = clean_field(sick[2], "疾患詳細")
+                    keyword = clean_field(sick[3], "キーワード")
+                    protocol = clean_field(sick[4], "撮影プロトコル")
+                    protocol_text = clean_field(sick[5], "撮影詳細")
+                    processing = clean_field(sick[6], "画像処理")
+                    processing_text = clean_field(sick[7], "画像処理詳細")  # ←重要
+                    contrast = clean_field(sick[8], "造影プロトコル")
+                    contrast_text = clean_field(sick[9], "造影詳細")
+                    
+                    # デバッグ: 処理結果を表示
+                    st.write(f"📋 処理結果 - {diesease}:")
+                    st.write(f"  - 画像処理: '{processing}'")
+                    st.write(f"  - 画像処理詳細: '{processing_text}'")
                     
                     # 新規挿入
                     pg_cursor.execute('''
@@ -2694,88 +2729,21 @@ def import_sqlite_data(sqlite_file_path):
                             processing, processing_text, contrast, contrast_text
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ''', (
-                        sick[1], sick[2], sick[3] or '', sick[4] or '', sick[5] or '',
-                        sick[6] or '', sick[7] or '', sick[8] or '', sick[9] or ''
+                        diesease, diesease_text, keyword, protocol, protocol_text,
+                        processing, processing_text, contrast, contrast_text
                     ))
                     imported_counts['sicks'] += 1
-                    st.write(f"✅ 疾患データ登録: {sick[1]}")
+                    st.write(f"✅ 疾患データ登録: {diesease}")
                     
                 except Exception as e:
-                    st.warning(f"❌ 疾患データエラー: {sick[1]} - {str(e)}")
-                    # エラーが発生してもロールバックせず継続
+                    st.warning(f"❌ 疾患データエラー: {sick[1] if len(sick) > 1 else 'Unknown'} - {str(e)}")
                     pg_conn.rollback()
                     continue
         except Exception as e:
             st.warning(f"疾患テーブル処理エラー: {str(e)}")
         
-        # お知らせデータ移行（修正版）
-        try:
-            sqlite_cursor.execute("SELECT COUNT(*) FROM forms")
-            form_count = sqlite_cursor.fetchone()[0]
-            st.write(f"📊 SQLiteお知らせ件数: {form_count}件")
-            
-            sqlite_cursor.execute("SELECT * FROM forms")
-            forms = sqlite_cursor.fetchall()
-            
-            for form in forms:
-                try:
-                    # formsテーブルの構造を動的に判定
-                    # 日付フィールドを判定して適切な列を選択
-                    form_data = list(form)
-                    
-                    # 可能なタイトルと本文の組み合わせを試す
-                    title = None
-                    main_content = None
-                    
-                    # パターン1: 通常のテーブル構造 (id, title, main, created_at, updated_at)
-                    if len(form_data) >= 3:
-                        # form[1]が日付でない場合はタイトルとして使用
-                        if form_data[1] and not (isinstance(form_data[1], str) and 
-                                               ('-' in form_data[1] and ':' in form_data[1])):
-                            title = str(form_data[1])
-                            main_content = str(form_data[2]) if form_data[2] else ""
-                        # form[2]をタイトルとして試す
-                        elif form_data[2] and not (isinstance(form_data[2], str) and 
-                                                  ('-' in form_data[2] and ':' in form_data[2])):
-                            title = str(form_data[2])
-                            main_content = str(form_data[3]) if len(form_data) > 3 and form_data[3] else ""
-                        else:
-                            # すべて日付の場合は作成日時をタイトルに
-                            if len(form_data) > 4:
-                                title = f"お知らせ {form_data[4]}" if form_data[4] else f"お知らせ {form_data[0]}"
-                            else:
-                                title = f"お知らせ {form_data[0]}"
-                            main_content = "内容が設定されていません"
-                    
-                    # タイトルの最終確認
-                    if not title:
-                        title = f"お知らせ_{form_data[0]}"
-                    
-                    # タイトルの長さ制限
-                    if len(title) > 100:
-                        title = title[:97] + "..."
-                    
-                    # まず重複チェック
-                    pg_cursor.execute("SELECT COUNT(*) FROM forms WHERE title = %s", (title,))
-                    exists = pg_cursor.fetchone()[0] > 0
-                    
-                    if exists:
-                        st.write(f"⚠️ お知らせ重複スキップ: {title}")
-                        continue
-                    
-                    # 新規挿入
-                    pg_cursor.execute('''
-                        INSERT INTO forms (title, main) VALUES (%s, %s)
-                    ''', (title, main_content))
-                    imported_counts['forms'] += 1
-                    st.write(f"✅ お知らせ登録: {title}")
-                    
-                except Exception as e:
-                    st.warning(f"❌ お知らせエラー: {title if 'title' in locals() else 'Unknown'} - {str(e)}")
-                    pg_conn.rollback()
-                    continue
-        except Exception as e:
-            st.warning(f"お知らせテーブル処理エラー: {str(e)}")
+        # お知らせデータ移行（スキップ）
+        st.info("ℹ️ お知らせデータの取り込みはスキップされます")
         
         # プロトコルデータ移行（テーブル存在チェック）
         try:
@@ -2787,30 +2755,31 @@ def import_sqlite_data(sqlite_file_path):
                 protocol_count = sqlite_cursor.fetchone()[0]
                 st.write(f"📊 SQLiteプロトコル件数: {protocol_count}件")
                 
-                sqlite_cursor.execute("SELECT * FROM protocols")
-                protocols = sqlite_cursor.fetchall()
-                
-                for protocol in protocols:
-                    try:
-                        # まず重複チェック
-                        pg_cursor.execute("SELECT COUNT(*) FROM protocols WHERE title = %s", (protocol[2],))
-                        exists = pg_cursor.fetchone()[0] > 0
-                        
-                        if exists:
-                            st.write(f"⚠️ プロトコル重複スキップ: {protocol[2]}")
+                if protocol_count > 0:
+                    sqlite_cursor.execute("SELECT * FROM protocols")
+                    protocols = sqlite_cursor.fetchall()
+                    
+                    for protocol in protocols:
+                        try:
+                            # 重複チェック
+                            pg_cursor.execute("SELECT COUNT(*) FROM protocols WHERE title = %s", (protocol[2],))
+                            exists = pg_cursor.fetchone()[0] > 0
+                            
+                            if exists:
+                                st.write(f"⚠️ プロトコル重複スキップ: {protocol[2]}")
+                                continue
+                            
+                            # 新規挿入
+                            pg_cursor.execute('''
+                                INSERT INTO protocols (category, title, content) VALUES (%s, %s, %s)
+                            ''', (protocol[1] or '一般', protocol[2], protocol[3] or ''))
+                            imported_counts['protocols'] += 1
+                            st.write(f"✅ プロトコル登録: {protocol[2]}")
+                            
+                        except Exception as e:
+                            st.warning(f"❌ プロトコルエラー: {protocol[2]} - {str(e)}")
+                            pg_conn.rollback()
                             continue
-                        
-                        # 新規挿入
-                        pg_cursor.execute('''
-                            INSERT INTO protocols (category, title, content) VALUES (%s, %s, %s)
-                        ''', (protocol[1] or '一般', protocol[2], protocol[3] or ''))
-                        imported_counts['protocols'] += 1
-                        st.write(f"✅ プロトコル登録: {protocol[2]}")
-                        
-                    except Exception as e:
-                        st.warning(f"❌ プロトコルエラー: {protocol[2]} - {str(e)}")
-                        pg_conn.rollback()
-                        continue
             else:
                 st.info("ℹ️ Laravel版SQLiteにプロトコルテーブルは存在しません")
         except Exception as e:
@@ -2821,10 +2790,8 @@ def import_sqlite_data(sqlite_file_path):
         sqlite_conn.close()
         pg_conn.close()
         
-        # キャッシュクリア
+        # キャッシュクリア（疾患データのみ）
         get_all_sicks.clear()
-        get_all_forms.clear()
-        get_all_protocols.clear()
         
         return True, imported_counts
         
