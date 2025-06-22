@@ -1103,28 +1103,7 @@ def show_search_page():
             st.rerun()
 
 def show_detail_page():
-    """疾患詳細ページ（修正版）"""
-    # ページトップにスクロール（詳細ページ専用）
-    st.markdown("""
-    <script>
-    // 即座にページトップへスクロール
-    window.scrollTo({top: 0, behavior: 'instant'});
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-    
-    // 少し遅延してもう一度確実にスクロール
-    setTimeout(function() {
-        window.scrollTo({top: 0, behavior: 'smooth'});
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-    }, 50);
-    
-    // コンテンツ読み込み後にもう一度
-    setTimeout(function() {
-        window.scrollTo(0, 0);
-    }, 200);
-    </script>
-    """, unsafe_allow_html=True)
+    """疾患詳細ページ（強制スクロール修正版）"""
     
     if 'selected_sick_id' not in st.session_state:
         st.error("疾患が選択されていません")
@@ -1142,6 +1121,47 @@ def show_detail_page():
                 del st.session_state.selected_sick_id
             st.rerun()
         return
+    
+    # 強制的にページトップへスクロール（複数の方法で確実に）
+    st.markdown("""
+    <div id="top-anchor"></div>
+    <script>
+    // 方法1: 即座にスクロール
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+    window.scrollTo(0, 0);
+    
+    // 方法2: DOMContentLoaded後
+    document.addEventListener('DOMContentLoaded', function() {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
+    });
+    
+    // 方法3: 連続実行で確実に
+    for(let i = 0; i < 10; i++) {
+        setTimeout(function() {
+            window.scrollTo(0, 0);
+            document.body.scrollTop = 0;
+            document.documentElement.scrollTop = 0;
+        }, i * 100);
+    }
+    
+    // 方法4: アンカーを使用
+    setTimeout(function() {
+        document.getElementById('top-anchor').scrollIntoView();
+    }, 500);
+    </script>
+    <style>
+    #top-anchor {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 1px;
+        width: 1px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
     st.title(f"{sick_data[1]}")
     
@@ -3283,7 +3303,7 @@ def navigate_to_page(page):
     st.rerun()
 
 def main():
-    """メイン関数 - JavaScript併用版"""
+    """メイン関数 - JavaScript併用版（セッション復元対応）"""
     
     # JavaScript でブラウザイベントを監視
     st.markdown("""
@@ -3322,12 +3342,21 @@ def main():
         st.error("アプリケーションの初期化に失敗しました")
         return
     
+    # セッション復元を最初に試行
+    if 'user' not in st.session_state:
+        restored_session = load_session_from_db()
+        if restored_session:
+            st.session_state.user = restored_session['user']
+            st.session_state.page = restored_session['page']
+            st.success(f"セッションを復元しました - {restored_session['user']['name']}さん")
+    
     # URL同期処理
     query_params = st.query_params
     url_page = query_params.get('page', 'home')
     
     # URLページを強制的にセッションに設定
-    st.session_state.page = url_page
+    if 'user' in st.session_state:  # ログイン済みの場合のみ
+        st.session_state.page = url_page
     
     # ページ変更時の状態クリア
     clear_page_states(url_page)
@@ -3336,6 +3365,9 @@ def main():
     if not check_login():
         show_login_page()
         return
+    
+    # セッション更新
+    update_session_in_db()
     
     # UI表示
     st.markdown(get_custom_css(), unsafe_allow_html=True)
@@ -3374,10 +3406,10 @@ def main():
             show_create_protocol_page()
         elif current_page == 'edit_protocol':
             show_edit_protocol_page()
-        elif current_page == 'admin':  # ← この行を追加
+        elif current_page == 'admin':
             show_admin_page()
         else:
-            # 不明なページの場合はホームページにリダイレクト（loginからhomeに変更）
+            # 不明なページの場合はホームページにリダイレクト
             st.session_state.page = 'home'
             st.query_params.clear()
             st.query_params["page"] = "home"
@@ -3385,7 +3417,7 @@ def main():
             
     except Exception as e:
         st.error(f"ページ表示エラー: {str(e)}")
-        # エラー時もホームページにリダイレクト（loginからhomeに変更）
+        # エラー時もホームページにリダイレクト
         st.session_state.page = 'home'
         st.query_params.clear()
         st.query_params["page"] = "home"
