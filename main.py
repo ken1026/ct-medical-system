@@ -3369,8 +3369,6 @@ def main():
                 st.session_state.edit_notice_id = restored_session['edit_notice_id']
             if restored_session.get('edit_protocol_id'):
                 st.session_state.edit_protocol_id = restored_session['edit_protocol_id']
-            
-            st.success(f"セッションを復元しました - {restored_session['user']['name']}さん")
     
     # URL同期処理（現在のページを保持）
     query_params = st.query_params
