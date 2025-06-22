@@ -36,7 +36,7 @@ if 'page' in query_params:
     st.session_state.page = query_params['page']
 
 def save_session_to_db(user_id, session_data):
-    """セッション情報をデータベースに保存"""
+    """セッション情報をデータベースに保存（強化版）"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -57,7 +57,7 @@ def save_session_to_db(user_id, session_data):
         return False
 
 def load_session_from_db():
-    """データベースからセッション情報を復元"""
+    """データベースからセッション情報を復元（強化版）"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -96,7 +96,13 @@ def load_session_from_db():
                         'name': user[1],
                         'email': user[2]
                     },
-                    'page': session_data.get('page', 'home')
+                    'page': session_data.get('page', 'home'),
+                    'selected_sick_id': session_data.get('selected_sick_id'),
+                    'selected_notice_id': session_data.get('selected_notice_id'),
+                    'selected_protocol_id': session_data.get('selected_protocol_id'),
+                    'edit_sick_id': session_data.get('edit_sick_id'),
+                    'edit_notice_id': session_data.get('edit_notice_id'),
+                    'edit_protocol_id': session_data.get('edit_protocol_id')
                 }
         
         return None
@@ -120,13 +126,18 @@ def get_user_by_id(user_id):
         return None
 
 def update_session_in_db():
-    """現在のセッション状態をデータベースに更新"""
+    """現在のセッション状態をデータベースに更新（強化版）"""
     if 'user' in st.session_state:
         session_data = {
-            'page': st.session_state.get('page', 'home')
+            'page': st.session_state.get('page', 'home'),
+            'selected_sick_id': st.session_state.get('selected_sick_id'),
+            'selected_notice_id': st.session_state.get('selected_notice_id'),
+            'selected_protocol_id': st.session_state.get('selected_protocol_id'),
+            'edit_sick_id': st.session_state.get('edit_sick_id'),
+            'edit_notice_id': st.session_state.get('edit_notice_id'),
+            'edit_protocol_id': st.session_state.get('edit_protocol_id')
         }
         save_session_to_db(st.session_state.user['id'], session_data)
-
 # ページ履歴管理関数
 def add_to_page_history(page):
     """ページ履歴に追加"""
@@ -3344,6 +3355,21 @@ def main():
             # 復元時は既存のページ設定を優先
             if 'page' not in st.session_state:
                 st.session_state.page = restored_session.get('page', 'home')
+            
+            # 詳細ページ関連の状態も復元
+            if restored_session.get('selected_sick_id'):
+                st.session_state.selected_sick_id = restored_session['selected_sick_id']
+            if restored_session.get('selected_notice_id'):
+                st.session_state.selected_notice_id = restored_session['selected_notice_id']
+            if restored_session.get('selected_protocol_id'):
+                st.session_state.selected_protocol_id = restored_session['selected_protocol_id']
+            if restored_session.get('edit_sick_id'):
+                st.session_state.edit_sick_id = restored_session['edit_sick_id']
+            if restored_session.get('edit_notice_id'):
+                st.session_state.edit_notice_id = restored_session['edit_notice_id']
+            if restored_session.get('edit_protocol_id'):
+                st.session_state.edit_protocol_id = restored_session['edit_protocol_id']
+            
             st.success(f"セッションを復元しました - {restored_session['user']['name']}さん")
     
     # URL同期処理（現在のページを保持）
