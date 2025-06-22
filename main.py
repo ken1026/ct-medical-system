@@ -3238,13 +3238,24 @@ def clear_page_states(page):
                 del st.session_state[state]
 
 def navigate_to_page(page):
-    """ページナビゲーション - 確実版"""
+    """ページナビゲーション - 確実版（ページトップスクロール対応）"""
     # セッション状態を更新
     st.session_state.page = page
     
     # URLを更新（複数の方法で確実に）
     st.query_params.clear()
     st.query_params["page"] = page
+    
+    # ページトップにスクロール
+    st.markdown("""
+    <script>
+    setTimeout(function() {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+    }, 100);
+    </script>
+    """, unsafe_allow_html=True)
     
     # 強制再読み込み
     st.rerun()
