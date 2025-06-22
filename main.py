@@ -1103,7 +1103,42 @@ def show_search_page():
             st.rerun()
 
 def show_detail_page():
-    """疾患詳細ページ（強制スクロール修正版）"""
+    """疾患詳細ページ（最終完成版）"""
+    
+    # 強制的にページトップへスクロール（非表示で実行）
+    st.components.v1.html("""
+    <div id="top-anchor" style="position: absolute; top: 0; left: 0; height: 1px; width: 1px;"></div>
+    <script>
+    // 方法1: 即座にスクロール
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+    window.scrollTo(0, 0);
+    
+    // 方法2: DOMContentLoaded後
+    document.addEventListener('DOMContentLoaded', function() {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
+    });
+    
+    // 方法3: 連続実行で確実に
+    for(let i = 0; i < 5; i++) {
+        setTimeout(function() {
+            window.scrollTo(0, 0);
+            document.body.scrollTop = 0;
+            document.documentElement.scrollTop = 0;
+        }, i * 100);
+    }
+    
+    // 方法4: アンカーを使用
+    setTimeout(function() {
+        var anchor = document.getElementById('top-anchor');
+        if (anchor) {
+            anchor.scrollIntoView();
+        }
+    }, 500);
+    </script>
+    """, height=0)
     
     if 'selected_sick_id' not in st.session_state:
         st.error("疾患が選択されていません")
@@ -1121,47 +1156,6 @@ def show_detail_page():
                 del st.session_state.selected_sick_id
             st.rerun()
         return
-    
-    # 強制的にページトップへスクロール（複数の方法で確実に）
-    st.markdown("""
-    <div id="top-anchor"></div>
-    <script>
-    // 方法1: 即座にスクロール
-    document.body.scrollTop = 0;
-    document.documentElement.scrollTop = 0;
-    window.scrollTo(0, 0);
-    
-    // 方法2: DOMContentLoaded後
-    document.addEventListener('DOMContentLoaded', function() {
-        window.scrollTo(0, 0);
-        document.body.scrollTop = 0;
-        document.documentElement.scrollTop = 0;
-    });
-    
-    // 方法3: 連続実行で確実に
-    for(let i = 0; i < 10; i++) {
-        setTimeout(function() {
-            window.scrollTo(0, 0);
-            document.body.scrollTop = 0;
-            document.documentElement.scrollTop = 0;
-        }, i * 100);
-    }
-    
-    // 方法4: アンカーを使用
-    setTimeout(function() {
-        document.getElementById('top-anchor').scrollIntoView();
-    }, 500);
-    </script>
-    <style>
-    #top-anchor {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 1px;
-        width: 1px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
     
     st.title(f"{sick_data[1]}")
     
@@ -3347,16 +3341,21 @@ def main():
         restored_session = load_session_from_db()
         if restored_session:
             st.session_state.user = restored_session['user']
-            st.session_state.page = restored_session['page']
+            # 復元時は既存のページ設定を優先
+            if 'page' not in st.session_state:
+                st.session_state.page = restored_session.get('page', 'home')
             st.success(f"セッションを復元しました - {restored_session['user']['name']}さん")
     
-    # URL同期処理
+    # URL同期処理（現在のページを保持）
     query_params = st.query_params
-    url_page = query_params.get('page', 'home')
+    url_page = query_params.get('page')
     
-    # URLページを強制的にセッションに設定
-    if 'user' in st.session_state:  # ログイン済みの場合のみ
+    # URLに明示的にページが指定されている場合のみ、そのページに移動
+    if url_page and 'user' in st.session_state:
         st.session_state.page = url_page
+    elif 'user' in st.session_state and 'page' not in st.session_state:
+        # ログイン済みだがページが設定されていない場合のみホームに設定
+        st.session_state.page = 'home'
     
     # ページ変更時の状態クリア
     clear_page_states(url_page)
@@ -3409,19 +3408,17 @@ def main():
         elif current_page == 'admin':
             show_admin_page()
         else:
-            # 不明なページの場合はホームページにリダイレクト
-            st.session_state.page = 'home'
-            st.query_params.clear()
-            st.query_params["page"] = "home"
-            st.rerun()
+            # 不明なページの場合は現在のページを保持（変更しない）
+            if st.session_state.get('page') not in ['login', 'welcome', 'home', 'search', 'detail', 'create_disease', 'edit_disease', 'notices', 'notice_detail', 'create_notice', 'edit_notice', 'protocols', 'protocol_detail', 'create_protocol', 'edit_protocol', 'admin']:
+                st.session_state.page = 'home'
+            st.query_params["page"] = st.session_state.page
             
     except Exception as e:
         st.error(f"ページ表示エラー: {str(e)}")
-        # エラー時もホームページにリダイレクト
-        st.session_state.page = 'home'
-        st.query_params.clear()
-        st.query_params["page"] = "home"
-        st.rerun()
+        # エラー時は現在のページを保持
+        if 'page' not in st.session_state:
+            st.session_state.page = 'home'
+        st.query_params["page"] = st.session_state.page
 
 
 def clear_page_states(page):
@@ -3438,14 +3435,19 @@ def clear_page_states(page):
                 del st.session_state[state]
 
 
+
 def navigate_to_page(page):
-    """ページナビゲーション - 確実版"""
+    """ページナビゲーション - 確実版（URL同期対応）"""
     # セッション状態を更新
     st.session_state.page = page
     
-    # URLを更新（複数の方法で確実に）
+    # URLパラメータを更新
     st.query_params.clear()
     st.query_params["page"] = page
+    
+    # セッションをDBに保存
+    if 'user' in st.session_state:
+        update_session_in_db()
     
     # 強制再読み込み
     st.rerun()
